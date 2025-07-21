@@ -9,13 +9,11 @@
 ; Win + Ctrl + C             Append selected text to the end of clipboard with blank line between texts
 ; Win + Ctrl + X             Compare selected text with clipboard; optionally replace selected text
 
-
 #Requires AutoHotkey v2.0
 
 monitorOffset := 1  ; Offset solve problem when some windows in fullscreen are bigger than monitor
 groupCounter := 0  ; It is not possible to delete group so for each new minimize is necessary to make new numbered group
-topmostMinimized := 0  ; Store ID of topmost minimized window (used by quick restore pair)
-; minimizedWindows := []  ; Store IDs of all minimized windows (used by slow restore pair)
+minimizedWindows := []  ; Store IDs of all minimized windows (used by slow restore pair)
 gameList := StrSplit(IniRead("settings.ini", "GameList"), '`n')  ; Read list of game exe file names from ini file
 played := false  ; If Spotify played or not
 monitorToSwitchWindowsOn := IniRead("settings.ini", "Settings", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
@@ -79,13 +77,13 @@ IsOnPrimaryMonitor(id, offsetSwitch)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; For quick, bulk restore use this hotkey pair (group restore)
 #!F::  ; Press Win + F to minimize all windows on the primary monitor
 {
-    global groupCounter  ; Necessary to use global variable (if omitted, local variable will be used even if it has same name)
-    global topmostMinimized
+    global minimizedWindows  ; Necessary to use global variable (if omitted, local variable will be used even if it has same name)
+    global groupCounter
     groupCounter++  ; Increase group number (to be able to create new group)
-    topmostMinimized := 0
+    topmostWinFound := false
+
     ids := WinGetNormalList()  ; Get all "normal window" IDs
 
     ; Iterate all IDs and choose IDs of windows that are on the primary monitor and add it to group and minimized list
@@ -93,77 +91,31 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     {
         if (IsOnPrimaryMonitor(this_id, true))  ; Check if on the primary monitor
         {
-            GroupAdd "MinimizeGroup" groupCounter, "ahk_id " this_id  ; Add window to group (at the first iteration it'll always create new group)
-            if topmostMinimized == 0
-                topmostMinimized := this_id  ; Get topmost window
-        }
-    }
-
-    ; Minimize all windows on the primary monitor at the same time
-    WinMinimize("ahk_group MinimizeGroup" groupCounter)
-}
-
-#!H::  ; Press Win + H to restore all minimized windows on the primary monitor and activate the topmost one
-{
-    global topmostMinimized
-    ids := WinGetNormalList()  ; Get all "normal window" IDs
-    active_id := 0
-
-    ; Iterate all IDs to find ID of the topmost window of the primary monitor that is not minimized (if user open window between minimization and restoration it will be active after restoration)
-    for (this_id in ids)
-    {
-        if (IsOnPrimaryMonitor(this_id, true) && WinGetMinMax("ahk_id " this_id) != -1)  ; Check if on the primary monitor and if it's not minimized
-        {
-            active_id := this_id
-            break
-        }
-    }
-
-    if topmostMinimized != 0  ; Check if there was some minimized window
-    {
-        WinRestore("ahk_group MinimizeGroup" groupCounter)
-
-        ; Activate window that was active on the primary monitor before window restoration or if there was none then activate window that was topmost before restoration
-        if active_id == 0
-        {
-            active_id := topmostMinimized
-        }
-        if WinExist("ahk_id " active_id)
-        {
-            WinActivate("ahk_id " active_id)
-        }
-        topmostMinimized := 0
-    }
-}
-
-; For slower, well sorted, restore use this hotkey pair (one by one restore)
-/*
-#!F::  ; Press Win + F to minimize all windows on the primary monitor
-{
-    global minimizedWindows
-    global groupCounter
-    minimizedWindows := []
-    groupCounter++
-    ids := WinGetNormalList()  ; Get all "normal window" IDs
-
-    ; Iterate all IDs and choose IDs of windows that are on the primary monitor and add it to group and minimizedWindows list
-    for (this_id in ids)
-    {
-        if (IsOnPrimaryMonitor(this_id, true))  ; Check if on the primary monitor
-        {
-            GroupAdd "MinimizeGroup" groupCounter, "ahk_id " this_id  ; Add window to group (at the first iteration it'll always create new group)
+            ; reset list of minimized windows (it can be at the start of this hotkey but if this hotkey would be activated twice in a row by mistake, the hotkey for restoration will not work)
+            if !topmostWinFound
+            {
+                minimizedWindows := []
+                topmostWinFound := true
+            }
+            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window to group (at the first iteration it'll always create new group)
             minimizedWindows.Push(this_id)  ; Add to minimized list
         }
     }
 
     ; Minimize all windows on the primary monitor at the same time
-    WinMinimize("ahk_group MinimizeGroup" groupCounter)
+    if topmostWinFound
+        WinMinimize("ahk_group MinimizeGroup" groupCounter)
 }
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #!H::  ; Press Win + H to restore all minimized windows on the primary monitor and activate the topmost one
 {
+    ; This hotkey quickly restore minimized windows using groups; For slower but well sorted restore comment and uncomment marked parts
     global minimizedWindows
+    global groupCounter  ; comment for slow restore
+    groupCounter++  ; comment for slow restore
+
     ids := WinGetNormalList()  ; Get all "normal window" IDs
     active_id := 0
 
@@ -177,18 +129,20 @@ IsOnPrimaryMonitor(id, offsetSwitch)
         }
     }
 
-
     if minimizedWindows.Length > 0 ; Check if the list of minimized windows is not empty
     {
         ; Iterate minimizedWindows list from behind and restore windows that exist and that are not maximized one by one (maximized windows should not be restored because they will be unmaximized)
-        Loop minimizedWindows.Length
+        loop minimizedWindows.Length
         {
             this_id := minimizedWindows[-A_Index]
             if WinExist("ahk_id " this_id) && WinGetMinMax("ahk_id " this_id) != 1
             {
-                WinRestore("ahk_id " this_id)
+                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window ID in group; comment for slow restore
+                ; WinRestore("ahk_id " this_id)  ; uncomment for slow restore
             }
         }
+
+        WinRestore("ahk_group MinimizeGroup" groupCounter)  ; comment for slow restore
 
         ; Activate window that was active on the primary monitor before window restoration or if there was none then activate window that was topmost before restoration
         if active_id == 0
@@ -202,7 +156,6 @@ IsOnPrimaryMonitor(id, offsetSwitch)
         minimizedWindows := []
     }
 }
-*/
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
