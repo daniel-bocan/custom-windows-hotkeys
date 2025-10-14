@@ -68,7 +68,7 @@ Settings are stored in the `settings.ini` file. This file contains three key ite
 
 - Add games that support **Discord's overlay** to the `gameList` section to enable proper detection and handling. List each game’s `.exe` file name **on a separate line**.
 
-### 5. Set up Power schemes to be used in a script (Recomended)
+### 5. Set up Power schemes to be used in a script (Recommended)
 In order for the script to use schemes and Energy saver, they need to be set up first.  
 It is not neccessery to set this up. If they aren't set up, the script will create all the necessary schemes and can switch between them. However the Energy saver will not be used, which is the most important part, so it will be almost useless without setting this up.
 

@@ -26,8 +26,8 @@ minimizedWindows := []  ; Store IDs of all minimized windows (used by slow resto
 gameList := StrSplit(IniRead("settings.ini", "GameList"), '`n')  ; Read list of game exe file names from ini file
 played := false  ; If Spotify played or not
 monitorToSwitchWindowsOn := IniRead("settings.ini", "Settings", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
-portableMode := MonitorGetCount() == 1
-enableLogonActions := IniRead("settings.ini", "Actions", "doLogonActions", 1)
+enableLogonActions := IniRead("settings.ini", "Actions", "enableLogonActions", 1)
+wasPortableEnabled := MonitorGetCount() >= 2  ; Set inverted value from the value it should be for the first OnWake() function call (log on)
 
 DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling to get accurate window position and size
 
@@ -66,13 +66,14 @@ if enableLogonActions
 
     OnWake()
     {
-        if portableMode
+        global wasPortableEnabled
+        if MonitorGetCount() == 1 && NOT wasPortableEnabled
         {
             ; Enable Power saver Power scheme and enable Energy saver
             ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is neccessery to set it up before using the script)
             RunWait 'powercfg /setactive a1841308-3541-4fab-bc81-f71556f20b4a'
         }
-        else
+        else if MonitorGetCount() >= 2 && wasPortableEnabled
         {
             GetDirStartsWith(start)
             {
@@ -135,6 +136,7 @@ if enableLogonActions
             ; Enable Balanced Power scheme and disable Energy saver
             RunWait 'powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e'
         }
+        wasPortableEnabled := MonitorGetCount() == 1
     }
 }
 
