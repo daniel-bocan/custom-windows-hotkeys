@@ -9,6 +9,15 @@
 ; Win + Ctrl + C             Append selected text to the end of clipboard with blank line between texts
 ; Win + Ctrl + X             Compare selected text with clipboard; optionally replace selected text
 
+; Additional features:
+; Script run actions that will trigger after each log on (script start) and on every wake up
+; The actions depends on whether portable mode is enabled (if there is only 1 monitor connected)
+; Portable mode:
+; Enable Power saver Power scheme and enable Energy saver
+; Home mode:
+; Enable Balanced Power scheme and disable Energy saver
+; Run Discord and Spotify and move these windows to secondary or selected monitor
+
 #Requires AutoHotkey v2.0
 
 monitorOffset := 1  ; Offset solve problem when some windows in fullscreen are bigger than monitor
@@ -17,8 +26,119 @@ minimizedWindows := []  ; Store IDs of all minimized windows (used by slow resto
 gameList := StrSplit(IniRead("settings.ini", "GameList"), '`n')  ; Read list of game exe file names from ini file
 played := false  ; If Spotify played or not
 monitorToSwitchWindowsOn := IniRead("settings.ini", "Settings", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
+portableMode := MonitorGetCount() == 1
+enableLogonActions := IniRead("settings.ini", "Actions", "doLogonActions", 1)
 
 DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling to get accurate window position and size
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Actions that will trigger after each log on (script start) and on every wake up
+; The actions depends on whether portable mode is enabled (if there is only 1 monitor connected)
+; Portable mode:
+; Enable Power saver Power scheme and enable Energy saver
+; Home mode:
+; Enable Balanced Power scheme and disable Energy saver
+; Run Discord and Spotify and move these windows to secondary or selected monitor if not there
+
+if enableLogonActions
+{
+    ; Used on log on
+    OnWake()
+
+    ; Call OnWake() function when system wake up
+    last_tick := A_TickCount
+    SetTimer(CheckWake, 60000)  ; Check every 60 seconds
+
+    CheckWake()
+    {
+        static last_tick := A_TickCount
+        cur_tick := A_TickCount
+
+        ; If difference is too large -> system was asleep
+        if (cur_tick - last_tick > 120000)  ; 120+ seconds gap
+        {
+            OnWake()  ; Used on wake up
+        }
+
+        last_tick := cur_tick
+    }
+
+    OnWake()
+    {
+        if portableMode
+        {
+            ; Enable Power saver Power scheme and enable Energy saver
+            ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is neccessery to set it up before using the script)
+            RunWait 'powercfg /setactive a1841308-3541-4fab-bc81-f71556f20b4a'
+        }
+        else
+        {
+            GetDirStartsWith(start)
+            {
+                loop files start, 'D'
+                {
+                    return A_LoopFileFullPath
+                }
+            }
+        
+            ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
+            discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") "\Discord.exe"
+            spotifyPath := "C:\Users\" A_UserName "\AppData\Roaming\Spotify\Spotify.exe"
+        
+            ; Find monitor to which the windows will be moved
+            if MonitorGetCount() == 2
+            {
+                if MonitorGetPrimary() == 1
+                    monitor := 2
+                else
+                    monitor := 1
+            }
+            else
+            {
+                global monitorToSwitchWindowsOn
+                monitor := monitorToSwitchWindowsOn
+            }
+        
+            ; Get coordinates of the monitor
+            MonitorGet monitor, &Left, &Top
+            discord_id := "ahk_exe Discord.exe"
+            spotify_id := "ahk_exe Spotify.exe"
+        
+            if NOT WinExist(discord_id) && FileExist(discordPath)
+            {
+                Run(discordPath)
+                ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use instead of Run(discordPath) to run discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it kill discord
+                ; With Discord is problem that when it starts, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window.
+                if WinWait("Discord Updater") && WinWaitClose("Discord Updater") && NOT IsOnMonitor(discord_id, monitor, true)
+                {
+                    ; Unmaximize window, move it to the selected monitor and then maximize it
+                    WinRestore(discord_id)
+                    WinMove(Left, Top, , , discord_id)
+                    WinMaximize(discord_id)
+                }
+                WinActivate(discord_id)
+            }
+            if NOT WinExist(spotify_id) && FileExist(spotifyPath)
+            {
+                Run(spotifyPath)
+                ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use instead of Run(spotifyPath) to run spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill spotify
+                ; Wait until Spotify is running and if it is not on the selected monitor, move it there
+                if WinWait(spotify_id) && NOT IsOnMonitor(spotify_id, monitor, true)
+                {
+                    ; Unmaximize window, move it to the selected monitor and then maximize it
+                    WinRestore(spotify_id)
+                    WinMove(Left, Top, , , spotify_id)
+                    WinMaximize(spotify_id)
+                }
+            }
+            ; Enable Balanced Power scheme and disable Energy saver
+            RunWait 'powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e'
+        }
+    }
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Checks if the window has border but I use it to check if the window is "normal window"
 ; "normal window" is a window that is in foreground (minimized, maximized, restored, etc.) and not a special window on background like Program Manager, etc.
@@ -35,11 +155,11 @@ WinGetNormalList()
 {
     ids := WinGetList()
     normalWindows := []
-    for (this_id in ids)
+    for (thisID in ids)
     {
-        if (WinIsNormal(this_id))
+        if (WinIsNormal(thisID))
         {
-            normalWindows.Push(this_id)
+            normalWindows.Push(thisID)
         }
     }
     return normalWindows
@@ -87,9 +207,9 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     ids := WinGetNormalList()  ; Get all "normal window" IDs
 
     ; Iterate all IDs and choose IDs of windows that are on the primary monitor and add it to group and minimized list
-    for (this_id in ids)
+    for (thisID in ids)
     {
-        if (IsOnPrimaryMonitor(this_id, true))  ; Check if on the primary monitor
+        if (IsOnPrimaryMonitor(thisID, true))  ; Check if on the primary monitor
         {
             ; reset list of minimized windows (it can be at the start of this hotkey but if this hotkey would be activated twice in a row by mistake, the hotkey for restoration will not work)
             if !topmostWinFound
@@ -97,8 +217,8 @@ IsOnPrimaryMonitor(id, offsetSwitch)
                 minimizedWindows := []
                 topmostWinFound := true
             }
-            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window to group (at the first iteration it'll always create new group)
-            minimizedWindows.Push(this_id)  ; Add to minimized list
+            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " thisID)  ; Add window to group (at the first iteration it'll always create new group)
+            minimizedWindows.Push(thisID)  ; Add to minimized list
         }
     }
 
@@ -120,11 +240,11 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     active_id := 0
 
     ; Iterate all IDs to find ID of the topmost window of the primary monitor that is not minimized (if user open window between minimization and restoration it will be active after restoration)
-    for (this_id in ids)
+    for (thisID in ids)
     {
-        if (IsOnPrimaryMonitor(this_id, true) && WinGetMinMax("ahk_id " this_id) != -1)  ; Check if on the primary monitor and if it's not minimized
+        if (IsOnPrimaryMonitor(thisID, true) && WinGetMinMax("ahk_id " thisID) != -1)  ; Check if on the primary monitor and if it's not minimized
         {
-            active_id := this_id
+            active_id := thisID
             break
         }
     }
@@ -134,11 +254,11 @@ IsOnPrimaryMonitor(id, offsetSwitch)
         ; Iterate minimizedWindows list from behind and restore windows that exist and that are not maximized one by one (maximized windows should not be restored because they will be unmaximized)
         loop minimizedWindows.Length
         {
-            this_id := minimizedWindows[-A_Index]
-            if WinExist("ahk_id " this_id) && WinGetMinMax("ahk_id " this_id) != 1
+            thisID := minimizedWindows[-A_Index]
+            if WinExist("ahk_id " thisID) && WinGetMinMax("ahk_id " thisID) != 1
             {
-                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window ID in group; comment for slow restore
-                ; WinRestore("ahk_id " this_id)  ; uncomment for slow restore
+                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " thisID)  ; Add window ID in group; comment for slow restore
+                ; WinRestore("ahk_id " thisID)  ; uncomment for slow restore
             }
         }
 
@@ -198,14 +318,14 @@ IsOnPrimaryMonitor(id, offsetSwitch)
 
                 ; Iterate for IDs of windows that are on the same monitor as Discord
                 allMaximized := 1
-                for (this_id in ids)
+                for (thisID in ids)
                 {
-                    if (IsOnPrimaryMonitor(this_id, true) && monitor == 1 || !IsOnPrimaryMonitor(this_id, true) &&
+                    if (IsOnPrimaryMonitor(thisID, true) && monitor == 1 || !IsOnPrimaryMonitor(thisID, true) &&
                     monitor == 2)
                     {
-                        minimizedWindows.Push(this_id)  ; Add window IDs to minimized list
+                        minimizedWindows.Push(thisID)  ; Add window IDs to minimized list
                         if (allMaximized)
-                            allMaximized := WinGetMinMax("ahk_id " this_id)
+                            allMaximized := WinGetMinMax("ahk_id " thisID)
                     }
                 }
             }
@@ -228,9 +348,9 @@ IsOnPrimaryMonitor(id, offsetSwitch)
                         }
                         else  ; If there is some window that is not maximized it will move windows one by one from the topmost to the bottommost to the bottom to achieve the same window order as at the beginning
                         {
-                            for (this_id in minimizedWindows)
+                            for (thisID in minimizedWindows)
                             {
-                                WinMoveBottom("ahk_id " this_id)
+                                WinMoveBottom("ahk_id " thisID)
                             }
                         }
                     }
@@ -280,30 +400,30 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     }
     ids := WinGetNormalList()  ; Get all "normal window" IDs
     active_id := 0
-    this_id := 0
+    thisID := 0
 
     ; Iterate all IDs to find ID of the topmost window
-    for (this_id in ids)
+    for (thisID in ids)
     {
-        active_id := this_id
+        active_id := thisID
         break
     }
 
     ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
     loop ids.Length
     {
-        this_id := ids.Pop()
-        if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
+        thisID := ids.Pop()
+        if IsOnMonitor(thisID, monitor, true)  ; Check if on the secondary (chosen) monitor
         {
-            WinActivate("ahk_id " this_id)
-            if WinWaitActive("ahk_id " this_id, , 10)
+            WinActivate("ahk_id " thisID)
+            if WinWaitActive("ahk_id " thisID, , 10)
             {
                 break
             }
         }
     }
     ; Sleep 10  ; Determine for how long will the window be active (minimum is 1 for proper functioning)
-    if !IsOnMonitor(this_id, monitor, true)
+    if !IsOnMonitor(thisID, monitor, true)
         WinActivate("ahk_id " active_id)  ; Activate the window from the beginning
 }
 
