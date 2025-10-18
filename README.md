@@ -79,7 +79,7 @@ To change the VS Code font that will be used in **home mode**, modify `homeVSCod
 
 ### 5. Set up Power schemes (recommended, if you want to use them)
 In order for the script to use schemes and Energy saver, they need to be set up first.  
-It is not neccessery to set this up. If they aren't set up, the script will create all the necessary schemes and can switch between them. However the Energy saver will not be used, which is the most important part, so it will be almost useless without setting this up.
+It is not necessary to set this up. If they aren't set up, the script will create all the necessary schemes and can switch between them. However the Energy saver will not be used, which is the most important part, so it will be almost useless without setting this up.
 
 There are two schemes script use:
 - Balanced Power scheme - Default scheme, system use (already there)
@@ -142,7 +142,7 @@ Note: Values are in seconds.
 
 Now everything is working properly. In portable mode Power saver Power scheme and also Energy saver will be used. In home mode Balanced Power scheme will be used and Energy saver will be disabled.
 
-### Set up Monocraft font (Neccessary, if you want to use it)
+### Set up Monocraft font (necessary, if you want to use it)
 1. Download the `Monocraft.ttc` file from the latest relase from github: https://github.com/IdreesInc/Monocraft/releases.
 2. Double-click the downloaded file and click **Install**.
 3. Set the `portableVSCodeFont` or `homeVSCodeFont` variable to Monocraft.

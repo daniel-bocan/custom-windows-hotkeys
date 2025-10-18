@@ -212,7 +212,7 @@ OnWake()
             repeat_index++
         }
         ; Enable Power saver Power scheme and enable Energy saver
-        ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is neccessery to set it up before using the script)
+        ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is necessary to set it up before using the script)
         if powerSaverGUID != "" && changePowerPlans
         {
             ; Run cmd in background
