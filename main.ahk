@@ -14,37 +14,69 @@
 ; The actions depends on whether portable mode is enabled (if there is only 1 monitor connected)
 ; Portable mode:
 ; Enable Power saver Power scheme and enable Energy saver
+; Terminate Steam, Epic Games and Wargaming Game Center to disable update downloads
+; Switch VS Code font to portable font specified in the settings file
 ; Home mode:
 ; Enable Balanced Power scheme and disable Energy saver
 ; Run Discord and Spotify and move these windows to secondary or selected monitor
+; Run Steam, Epic Games and Wargaming Game Center to enable update downloads
+; Switch VS Code font to home font specified in the settings file
+
+; Note:
+; Many settings can be changed in the settings.ini file, including disabling any action or hotkey and setting custom hotkey key combiantions
 
 #Requires AutoHotkey v2.0
 
+; Constants
+powerSaverGUID := IniRead("settings.ini", "Constants", "powerSaverGUID", "")  ; GUID of Power saver Power scheme that should be generated with setup.ahk file
+
+; General Settings
+monitorToSwitchWindowsOn := IniRead("settings.ini", "General", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
+portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "")
+homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
+
+; Action toggler
+changePowerPlans := IniRead("settings.ini", "ActionToggler", "changePowerPlans", 1)
+discordStart := IniRead("settings.ini", "ActionToggler", "discordStart", 1)
+spotifyStart := IniRead("settings.ini", "ActionToggler", "spotifyStart", 1)
+gameLaunchersOperations := IniRead("settings.ini", "ActionToggler", "gameLaunchersOperations", 1)
+VSCodeFontChange := IniRead("settings.ini", "ActionToggler", "VSCodeFontChange", 1)
+
+; Hotkey toggler
+minimizeWindowsToggler := IniRead("settings.ini", "HotkeyToggler", "minimizeWindows", 1)
+restoreWindowsToggler := IniRead("settings.ini", "HotkeyToggler", "restoreWindows", 1)
+muteUnmuteDiscordSpotifyToggler := IniRead("settings.ini", "HotkeyToggler", "muteUnmuteDiscordSpotify", 1)
+switchWindowsToggler := IniRead("settings.ini", "HotkeyToggler", "switchWindows", 1)
+appendClipboardToggler := IniRead("settings.ini", "HotkeyToggler", "appendClipboard", 1)
+compareTextsToggler := IniRead("settings.ini", "HotkeyToggler", "compareTexts", 1)
+
+; Hotkeys
+minimizeWindowsHotkey := IniRead("settings.ini", "Hotkeys", "minimizeWindows", "#!F")
+restoreWindowsHotkey := IniRead("settings.ini", "Hotkeys", "restoreWindows", "#!H")
+muteUnmuteDiscordSpotifyHotkey := IniRead("settings.ini", "Hotkeys", "muteUnmuteDiscordSpotify", "#T")
+switchWindowsHotkey := IniRead("settings.ini", "Hotkeys", "switchWindows", "#B")
+appendClipboardHotkey := IniRead("settings.ini", "Hotkeys", "appendClipboard", "#^C")
+compareTextsHotkey := IniRead("settings.ini", "Hotkeys", "compareTexts", "#^X")
+
+; Game list
+gameList := StrSplit(IniRead("settings.ini", "GameList", , ""), '`n')
+
+; Global variables
+wasPortableEnabled := MonitorGetCount() >= 2  ; Set inverted value from the value it should be for the first OnWake() function call (log on)
 monitorOffset := 1  ; Offset solve problem when some windows in fullscreen are bigger than monitor
 groupCounter := 0  ; It is not possible to delete group so for each new minimize is necessary to make new numbered group
 minimizedWindows := []  ; Store IDs of all minimized windows (used by slow restore pair)
-gameList := StrSplit(IniRead("settings.ini", "GameList"), '`n')  ; Read list of game exe file names from ini file
 played := false  ; If Spotify played or not
-monitorToSwitchWindowsOn := IniRead("settings.ini", "Settings", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
-enableLogonActions := IniRead("settings.ini", "Actions", "enableLogonActions", 1)
-wasPortableEnabled := MonitorGetCount() >= 2  ; Set inverted value from the value it should be for the first OnWake() function call (log on)
 
 DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling to get accurate window position and size
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Actions that will trigger after each log on (script start) and on every wake up
-; The actions depends on whether portable mode is enabled (if there is only 1 monitor connected)
-; Portable mode:
-; Enable Power saver Power scheme and enable Energy saver
-; Home mode:
-; Enable Balanced Power scheme and disable Energy saver
-; Run Discord and Spotify and move these windows to secondary or selected monitor if not there
+; Main
 
-if enableLogonActions
+if changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
 {
-    ; Used on log on
-    OnWake()
+    OnWake()  ; Used on log on
 
     ; Call OnWake() function when system wake up
     last_tick := A_TickCount
@@ -53,94 +85,197 @@ if enableLogonActions
     CheckWake()
     {
         static last_tick := A_TickCount
-        cur_tick := A_TickCount
+        current_tick := A_TickCount
 
-        ; If difference is too large -> system was asleep
-        if (cur_tick - last_tick > 120000)  ; 120+ seconds gap
+        ; If difference is too large, system was asleep
+        if (current_tick - last_tick > 120000)
         {
             OnWake()  ; Used on wake up
         }
 
-        last_tick := cur_tick
-    }
-
-    OnWake()
-    {
-        global wasPortableEnabled
-        if MonitorGetCount() == 1 && NOT wasPortableEnabled
-        {
-            ; Enable Power saver Power scheme and enable Energy saver
-            ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is neccessery to set it up before using the script)
-            RunWait 'powercfg /setactive a1841308-3541-4fab-bc81-f71556f20b4a'
-        }
-        else if MonitorGetCount() >= 2 && wasPortableEnabled
-        {
-            GetDirStartsWith(start)
-            {
-                loop files start, 'D'
-                {
-                    return A_LoopFileFullPath
-                }
-            }
-        
-            ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
-            discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") "\Discord.exe"
-            spotifyPath := "C:\Users\" A_UserName "\AppData\Roaming\Spotify\Spotify.exe"
-        
-            ; Find monitor to which the windows will be moved
-            if MonitorGetCount() == 2
-            {
-                if MonitorGetPrimary() == 1
-                    monitor := 2
-                else
-                    monitor := 1
-            }
-            else
-            {
-                global monitorToSwitchWindowsOn
-                monitor := monitorToSwitchWindowsOn
-            }
-        
-            ; Get coordinates of the monitor
-            MonitorGet monitor, &Left, &Top
-            discord_id := "ahk_exe Discord.exe"
-            spotify_id := "ahk_exe Spotify.exe"
-        
-            if NOT WinExist(discord_id) && FileExist(discordPath)
-            {
-                Run(discordPath)
-                ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use instead of Run(discordPath) to run discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it kill discord
-                ; With Discord is problem that when it starts, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window.
-                if WinWait("Discord Updater") && WinWaitClose("Discord Updater") && NOT IsOnMonitor(discord_id, monitor, true)
-                {
-                    ; Unmaximize window, move it to the selected monitor and then maximize it
-                    WinRestore(discord_id)
-                    WinMove(Left, Top, , , discord_id)
-                    WinMaximize(discord_id)
-                }
-                WinActivate(discord_id)
-            }
-            if NOT WinExist(spotify_id) && FileExist(spotifyPath)
-            {
-                Run(spotifyPath)
-                ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use instead of Run(spotifyPath) to run spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill spotify
-                ; Wait until Spotify is running and if it is not on the selected monitor, move it there
-                if WinWait(spotify_id) && NOT IsOnMonitor(spotify_id, monitor, true)
-                {
-                    ; Unmaximize window, move it to the selected monitor and then maximize it
-                    WinRestore(spotify_id)
-                    WinMove(Left, Top, , , spotify_id)
-                    WinMaximize(spotify_id)
-                }
-            }
-            ; Enable Balanced Power scheme and disable Energy saver
-            RunWait 'powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e'
-        }
-        wasPortableEnabled := MonitorGetCount() == 1
+        last_tick := current_tick
     }
 }
 
+if minimizeWindowsToggler
+    Hotkey(minimizeWindowsHotkey, MinimizeWindows)
+if restoreWindowsToggler
+    Hotkey(restoreWindowsHotkey, RestoreWindows)
+if muteUnmuteDiscordSpotifyToggler
+    Hotkey(muteUnmuteDiscordSpotifyHotkey, MuteUnmuteDiscordSpotify)
+if switchWindowsToggler
+    Hotkey(switchWindowsHotkey, SwitchWindows)
+if appendClipboardToggler
+    Hotkey(appendClipboardHotkey, AppendClipboard)
+if compareTextsToggler
+    Hotkey(compareTextsHotkey, CompareTexts)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Log on and system wake up actions
+
+OnWake()
+{
+    global wasPortableEnabled
+
+    steam_exe := "Steam.exe"
+    epicgames_exe := "EpicGamesLauncher.exe"
+    VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
+
+    if MonitorGetCount() == 1 && !wasPortableEnabled
+    {
+        ; Check if Wargaming Game Center is running every 20 seconds and if yes terminate it
+        ; Also terminate Steam and  Epic Games in first iteration if it is running
+        ; Terminating WGC is designed differently because Steam and Epic Games can be run in the background so they don't start at startup, but are started manually in this script. But WGC can't be run in the background so it starts at startup and then terminates here. Terminating Steam and Epic Games only occurs here if it was in home mode and is now in portable mode.
+        if gameLaunchersOperations
+            SetTimer(KillWGC, 20000)
+        KillWGC()
+        {
+            wargaming_exe := "wgc.exe"
+            static repeat_index := 0  ; Only in function scope
+            if ProcessExist(wargaming_exe)
+            {
+                ProcessClose(wargaming_exe)
+                SetTimer(KillWGC, 0)  ; Disable timer
+            }
+            ; If it checked 10 times, stop checking it
+            else if repeat_index >= 10
+                SetTimer(KillWGC, 0)  ; Disable timer
+            ; Terminate Steam and Epic Games in first iteration if it is running
+            if repeat_index == 0
+            {
+                if ProcessExist(steam_exe)
+                    ProcessClose(steam_exe)
+                if ProcessExist(epicgames_exe)
+                    ProcessClose(epicgames_exe)
+            }
+            repeat_index++
+        }
+        psCode := ""
+        ; Enable Power saver Power scheme and enable Energy saver
+        ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is neccessery to set it up before using the script)
+        if powerSaverGUID != "" && changePowerPlans
+        {
+            psCode .= "powercfg /setactive " powerSaverGUID
+        }
+        ; Change VS Code font
+        if portableVSCodeFont != "" && VSCodeFontChange
+        {
+            if psCode != ""
+                psCode .= "; "
+            psCode .= "$settings = '" VSCodeSettingsPath "'; "
+            psCode .= "$json = Get-Content $settings | ConvertFrom-Json; "
+            psCode .= "$json.'editor.fontFamily' = '" portableVSCodeFont "'; "
+            psCode .= "$json | ConvertTo-Json -Depth 10 | Set-Content $settings"
+        }
+        ; Run powershell in background with command created above
+        if psCode != ""
+            Run 'powershell.exe -NoProfile -Command "' psCode '"', , "Hide"
+    }
+    else if MonitorGetCount() >= 2 && wasPortableEnabled
+    {
+        ; Find dir which starts with start variable
+        GetDirStartsWith(start)
+        {
+            loop files start, 'D'
+            {
+                return A_LoopFileFullPath
+            }
+        }
+
+        ; Find monitor to which the windows will be moved
+        if MonitorGetCount() == 2
+        {
+            if MonitorGetPrimary() == 1
+                monitor := 2
+            else
+                monitor := 1
+        }
+        else
+        {
+            global monitorToSwitchWindowsOn
+            monitor := monitorToSwitchWindowsOn
+        }
+
+        ; Get coordinates of the monitor
+        MonitorGet monitor, &Left, &Top
+        discord_exe := "Discord.exe"
+        discord_id := "ahk_exe " discord_exe
+        spotify_id := "ahk_exe Spotify.exe"
+        steam_id := "ahk_exe " steam_exe
+
+        ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
+        discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") "\Discord.exe"
+        spotifyPath := "C:\Users\" A_UserName "\AppData\Roaming\Spotify\Spotify.exe"
+        steamPath := "C:\Program Files (x86)\Steam\Steam.exe"
+        epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\EpicGamesLauncher.exe"
+
+        if !WinExist(discord_id) && FileExist(discordPath) && discordStart
+        {
+            wasDiscordRunning := ProcessExist(discord_exe)
+            Run(discordPath)
+            ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use this instead of Run(discordPath) to run discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it kill discord
+            ; With Discord is problem that when it starts after log on, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window. If Discord was running (on system wake up) no Updater window will show, so it will not wait for Discord Updater window but directly for Discord window
+            if !wasDiscordRunning && WinWait("Discord Updater") && WinWaitClose("Discord Updater") && !IsOnMonitor(
+                discord_id, monitor,
+                true) || wasDiscordRunning && WinWait(discord_id)
+            {
+                ; Unmaximize window, move it to the selected monitor and then maximize it
+                WinRestore(discord_id)
+                WinMove(Left, Top, , , discord_id)
+                WinMaximize(discord_id)
+            }
+            WinActivate(discord_id)
+        }
+        if !WinExist(spotify_id) && FileExist(spotifyPath) && spotifyStart
+        {
+            Run(spotifyPath)
+            ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use this instead of Run(spotifyPath) to run spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill spotify
+            ; Wait until Spotify is running and if it is not on the selected monitor, move it there
+            if WinWait(spotify_id, , 5) && !IsOnMonitor(spotify_id, monitor, true)
+            {
+                ; Unmaximize window, move it to the selected monitor and then maximize it
+                WinRestore(spotify_id)
+                WinMove(Left, Top, , , spotify_id)
+                WinMaximize(spotify_id)
+            }
+        }
+        ; Run Steam and Epic Games in background if it was not running. WGC run automatically on startup.
+        if !ProcessExist(steam_exe) && FileExist(steamPath) && gameLaunchersOperations
+        {
+            Run(steamPath " -Silent")
+            if WinWait(steam_id)
+                WinMinimize(steam_id)
+        }
+        if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
+            Run(epicgamesPath " -Silent")
+
+        psCode := ""
+        ; Enable Balanced Power scheme and disable Energy saver
+        if powerSaverGUID != "" && changePowerPlans
+        {
+            psCode .= "powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e"
+        }
+        ; Change VS Code font
+        if homeVSCodeFont != "" && VSCodeFontChange
+        {
+            if psCode != ""  ; If there is already command in psCode variable add ;  to it
+                psCode .= "; "
+            psCode .= "$settings = '" VSCodeSettingsPath "'; "
+            psCode .= "$json = Get-Content $settings | ConvertFrom-Json; "
+            psCode .= "$json.'editor.fontFamily' = '" homeVSCodeFont "'; "
+            psCode .= "$json | ConvertTo-Json -Depth 10 | Set-Content $settings"
+        }
+        ; Run powershell in background with command created above
+        if psCode != ""
+            Run 'powershell.exe -NoProfile -Command "' psCode '"', , "Hide"
+    }
+    wasPortableEnabled := MonitorGetCount() == 1
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Auxiliary functions for hotkeys
 
 ; Checks if the window has border but I use it to check if the window is "normal window"
 ; "normal window" is a window that is in foreground (minimized, maximized, restored, etc.) and not a special window on background like Program Manager, etc.
@@ -199,7 +334,9 @@ IsOnPrimaryMonitor(id, offsetSwitch)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#!F::  ; Press Win + F to minimize all windows on the primary monitor
+; Hotkeys
+
+MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monitor
 {
     global minimizedWindows  ; Necessary to use global variable (if omitted, local variable will be used even if it has same name)
     global groupCounter
@@ -229,9 +366,7 @@ IsOnPrimaryMonitor(id, offsetSwitch)
         WinMinimize("ahk_group MinimizeGroup" groupCounter)
 }
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#!H::  ; Press Win + H to restore all minimized windows on the primary monitor and activate the topmost one
+RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the primary monitor and activate the topmost one
 {
     ; This hotkey quickly restore minimized windows using groups; For slower but well sorted restore comment and uncomment marked parts
     global minimizedWindows
@@ -279,9 +414,7 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     }
 }
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#T:: ; Press Win + T to mute/unmute Discord microphone and pause/play Spotify if it is playing
+MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone and pause/play Spotify if it is playing
 {
     global gameList
     discord_id := WinExist("ahk_exe Discord.exe")  ; Check if Discord is running
@@ -382,9 +515,7 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     }
 }
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#B:: ; Press Win + B to switch between windows on the secondary or selected monitor
+SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or selected monitor
 {
     if MonitorGetCount() == 1
         monitor := 1
@@ -429,9 +560,7 @@ IsOnPrimaryMonitor(id, offsetSwitch)
         WinActivate("ahk_id " active_id)  ; Activate the window from the beginning
 }
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#^C:: ; Press Win + Ctrl + C to append selected text to the end of clipboard with blank line between texts
+AppendClipboard(*) ; Press Win + Ctrl + C to append selected text to the end of clipboard with blank line between texts
 {
     copied := A_Clipboard
     Send "^c"
@@ -439,9 +568,7 @@ IsOnPrimaryMonitor(id, offsetSwitch)
     A_Clipboard := copied "`n`n" A_Clipboard
 }
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#^X:: ; Press Win + Ctrl + X to compare selected text with clipboard; optionally replace selected text
+CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; optionally replace selected text
 {
     origText := A_Clipboard  ; Save copied text
     Send "^c"
