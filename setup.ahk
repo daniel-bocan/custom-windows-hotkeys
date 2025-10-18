@@ -13,7 +13,8 @@ if IniRead("settings.ini", "Constants", guidKey, "") == ""
     output := CmdOutput("powercfg -duplicatescheme a1841308-3541-4fab-bc81-f71556f20b4a")  ; Make copy default Power saver Power scheme
     guid := GetGUID(output)
     IniWrite(guid, "settings.ini", "Constants", guidKey)  ; Save GUID to settings.ini file
-    Run("powercfg /setdcvalueindex " guid " SUB_ENERGYSAVER ESBATTTHRESHOLD 100 && powercfg /setdcvalueindex " guid " SUB_ENERGYSAVER ESBRIGHTNESS 100", , "Hide")  ; Set Energy saver activation to 100% so it is always active and set brightness with Energy saver activated to 100% of brightness with Energy saver deactivated
+    Run("powercfg /setdcvalueindex " guid " SUB_ENERGYSAVER ESBATTTHRESHOLD 100 && powercfg /setdcvalueindex " guid " SUB_ENERGYSAVER ESBRIGHTNESS 100", ,
+        "Hide")  ; Set Energy saver activation to 100% so it is always active and set brightness with Energy saver activated to 100% of brightness with Energy saver deactivated
 
     ; Get GUID from line of informations (get the part that contains numbers)
     GetGUID(line)
@@ -24,7 +25,7 @@ if IniRead("settings.ini", "Constants", guidKey, "") == ""
                 return part
     }
 
-    ; return output of cmd command in parameter
+    ; Return output of cmd command in parameter
     CmdOutput(command)
     {
         shell := ComObject("WScript.Shell")

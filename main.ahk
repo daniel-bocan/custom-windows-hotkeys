@@ -68,6 +68,31 @@ groupCounter := 0  ; It is not possible to delete group so for each new minimize
 minimizedWindows := []  ; Store IDs of all minimized windows (used by slow restore pair)
 played := false  ; If Spotify played or not
 
+; Find dir which starts with start variable
+GetDirStartsWith(start)
+{
+    loop files start, 'D'
+    {
+        return A_LoopFileFullPath "\"
+    }
+}
+
+; Paths, .exe names, window ids
+discord_exe := "Discord.exe"
+spotify_exe := "Spotify.exe"
+steam_exe := "Steam.exe"
+epicgames_exe := "EpicGamesLauncher.exe"
+wargaming_exe := "wgc.exe"
+; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
+discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discord_exe
+spotifyPath := "C:\Users\" A_UserName "\AppData\Roaming\Spotify\" spotify_exe
+steamPath := "C:\Program Files (x86)\Steam\" steam_exe
+epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
+VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
+discord_id := "ahk_exe " discord_exe
+spotify_id := "ahk_exe " spotify_exe
+steam_id := "ahk_exe " steam_exe
+
 DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling to get accurate window position and size
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -114,13 +139,49 @@ if compareTextsToggler
 
 ; Log on and system wake up actions
 
+; Edit editor.fontFamily variable in settings.json file
+SetVSCodeFont(font)
+{
+    ; Basic function that join elements of an array and add a delimiter between them
+    StrJoin(Array, Delimiter := '')
+    {
+        output := ""
+        for element in Array
+        {
+            output .= element Delimiter
+        }
+        ; Trim the last added delimiter
+        return Trim(output, Delimiter)
+    }
+
+    contentStr := FileRead(VSCodeSettingsPath, "UTF-8")
+    content := StrSplit(contentStr, '`r`n')
+    for line in content
+    {
+        ; Find line that contains "editor.fontFamily":
+        if InStr(line, '"editor.fontFamily":')
+        {
+            ; Create new line with replaced value
+            newLine := SubStr(line, 1, InStr(line, ":")) " " '"' font '"'
+            ; If there was comma at the end add it again
+            if SubStr(Trim(line, " `t`r`n"), -1, 1) == ","
+            {
+                newLine .= ","
+            }
+            ; Change old line for new line
+            content[A_Index] := newLine
+        }
+    }
+    ; Join array to string and override file content with the new string
+    contentNew := StrJoin(content, "`r`n")
+    file := FileOpen(VSCodeSettingsPath, "w", "UTF-8") ; w = write (overwrite)
+    file.Write(contentNew)
+    file.Close()
+}
+
 OnWake()
 {
     global wasPortableEnabled
-
-    steam_exe := "Steam.exe"
-    epicgames_exe := "EpicGamesLauncher.exe"
-    VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
 
     if MonitorGetCount() == 1 && !wasPortableEnabled
     {
@@ -131,7 +192,6 @@ OnWake()
             SetTimer(KillWGC, 20000)
         KillWGC()
         {
-            wargaming_exe := "wgc.exe"
             static repeat_index := 0  ; Only in function scope
             if ProcessExist(wargaming_exe)
             {
@@ -151,38 +211,21 @@ OnWake()
             }
             repeat_index++
         }
-        psCode := ""
         ; Enable Power saver Power scheme and enable Energy saver
         ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is neccessery to set it up before using the script)
         if powerSaverGUID != "" && changePowerPlans
         {
-            psCode .= "powercfg /setactive " powerSaverGUID
+            ; Run cmd in background
+            Run("powercfg /setactive " powerSaverGUID, , "Hide")
         }
         ; Change VS Code font
         if portableVSCodeFont != "" && VSCodeFontChange
         {
-            if psCode != ""
-                psCode .= "; "
-            psCode .= "$settings = '" VSCodeSettingsPath "'; "
-            psCode .= "$json = Get-Content $settings | ConvertFrom-Json; "
-            psCode .= "$json.'editor.fontFamily' = '" portableVSCodeFont "'; "
-            psCode .= "$json | ConvertTo-Json -Depth 10 | Set-Content $settings"
+            SetVSCodeFont(portableVSCodeFont)
         }
-        ; Run powershell in background with command created above
-        if psCode != ""
-            Run 'powershell.exe -NoProfile -Command "' psCode '"', , "Hide"
     }
     else if MonitorGetCount() >= 2 && wasPortableEnabled
     {
-        ; Find dir which starts with start variable
-        GetDirStartsWith(start)
-        {
-            loop files start, 'D'
-            {
-                return A_LoopFileFullPath
-            }
-        }
-
         ; Find monitor to which the windows will be moved
         if MonitorGetCount() == 2
         {
@@ -199,16 +242,6 @@ OnWake()
 
         ; Get coordinates of the monitor
         MonitorGet monitor, &Left, &Top
-        discord_exe := "Discord.exe"
-        discord_id := "ahk_exe " discord_exe
-        spotify_id := "ahk_exe Spotify.exe"
-        steam_id := "ahk_exe " steam_exe
-
-        ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
-        discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") "\Discord.exe"
-        spotifyPath := "C:\Users\" A_UserName "\AppData\Roaming\Spotify\Spotify.exe"
-        steamPath := "C:\Program Files (x86)\Steam\Steam.exe"
-        epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\EpicGamesLauncher.exe"
 
         if !WinExist(discord_id) && FileExist(discordPath) && discordStart
         {
@@ -250,25 +283,17 @@ OnWake()
         if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
             Run(epicgamesPath " -Silent")
 
-        psCode := ""
         ; Enable Balanced Power scheme and disable Energy saver
         if powerSaverGUID != "" && changePowerPlans
         {
-            psCode .= "powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e"
+            ; Run cmd in background
+            Run("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e", , "Hide")
         }
         ; Change VS Code font
         if homeVSCodeFont != "" && VSCodeFontChange
         {
-            if psCode != ""  ; If there is already command in psCode variable add ;  to it
-                psCode .= "; "
-            psCode .= "$settings = '" VSCodeSettingsPath "'; "
-            psCode .= "$json = Get-Content $settings | ConvertFrom-Json; "
-            psCode .= "$json.'editor.fontFamily' = '" homeVSCodeFont "'; "
-            psCode .= "$json | ConvertTo-Json -Depth 10 | Set-Content $settings"
+            SetVSCodeFont(homeVSCodeFont)
         }
-        ; Run powershell in background with command created above
-        if psCode != ""
-            Run 'powershell.exe -NoProfile -Command "' psCode '"', , "Hide"
     }
     wasPortableEnabled := MonitorGetCount() == 1
 }
@@ -292,11 +317,11 @@ WinGetNormalList()
 {
     ids := WinGetList()
     normalWindows := []
-    for (thisID in ids)
+    for (this_id in ids)
     {
-        if (WinIsNormal(thisID))
+        if (WinIsNormal(this_id))
         {
-            normalWindows.Push(thisID)
+            normalWindows.Push(this_id)
         }
     }
     return normalWindows
@@ -346,9 +371,9 @@ MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monit
     ids := WinGetNormalList()  ; Get all "normal window" IDs
 
     ; Iterate all IDs and choose IDs of windows that are on the primary monitor and add it to group and minimized list
-    for (thisID in ids)
+    for (this_id in ids)
     {
-        if (IsOnPrimaryMonitor(thisID, true))  ; Check if on the primary monitor
+        if (IsOnPrimaryMonitor(this_id, true))  ; Check if on the primary monitor
         {
             ; reset list of minimized windows (it can be at the start of this hotkey but if this hotkey would be activated twice in a row by mistake, the hotkey for restoration will not work)
             if !topmostWinFound
@@ -356,8 +381,8 @@ MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monit
                 minimizedWindows := []
                 topmostWinFound := true
             }
-            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " thisID)  ; Add window to group (at the first iteration it'll always create new group)
-            minimizedWindows.Push(thisID)  ; Add to minimized list
+            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window to group (at the first iteration it'll always create new group)
+            minimizedWindows.Push(this_id)  ; Add to minimized list
         }
     }
 
@@ -377,11 +402,11 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
     active_id := 0
 
     ; Iterate all IDs to find ID of the topmost window of the primary monitor that is not minimized (if user open window between minimization and restoration it will be active after restoration)
-    for (thisID in ids)
+    for (this_id in ids)
     {
-        if (IsOnPrimaryMonitor(thisID, true) && WinGetMinMax("ahk_id " thisID) != -1)  ; Check if on the primary monitor and if it's not minimized
+        if (IsOnPrimaryMonitor(this_id, true) && WinGetMinMax("ahk_id " this_id) != -1)  ; Check if on the primary monitor and if it's not minimized
         {
-            active_id := thisID
+            active_id := this_id
             break
         }
     }
@@ -391,10 +416,10 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
         ; Iterate minimizedWindows list from behind and restore windows that exist and that are not maximized one by one (maximized windows should not be restored because they will be unmaximized)
         loop minimizedWindows.Length
         {
-            thisID := minimizedWindows[-A_Index]
-            if WinExist("ahk_id " thisID) && WinGetMinMax("ahk_id " thisID) != 1
+            this_id := minimizedWindows[-A_Index]
+            if WinExist("ahk_id " this_id) && WinGetMinMax("ahk_id " this_id) != 1
             {
-                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " thisID)  ; Add window ID in group; comment for slow restore
+                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window ID in group; comment for slow restore
                 ; WinRestore("ahk_id " thisID)  ; uncomment for slow restore
             }
         }
@@ -421,7 +446,7 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
     if (discord_id)
     {
         ; For games
-        if ContainsElement(gameList, WinGetProcessName("A"))  ; Check if game is active window (compare active window exe name with exe names from list)
+        if ContainsElement(gameList, WinGetProcessName("A"))  ; Check if game is active window (compare active window .exe name with .exe names from list)
         {
             Send "+;"
             Sleep 500
@@ -453,14 +478,14 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
 
                 ; Iterate for IDs of windows that are on the same monitor as Discord
                 allMaximized := 1
-                for (thisID in ids)
+                for (this_id in ids)
                 {
-                    if (IsOnPrimaryMonitor(thisID, true) && monitor == 1 || !IsOnPrimaryMonitor(thisID, true) &&
+                    if (IsOnPrimaryMonitor(this_id, true) && monitor == 1 || !IsOnPrimaryMonitor(this_id, true) &&
                     monitor == 2)
                     {
-                        minimizedWindows.Push(thisID)  ; Add window IDs to minimized list
+                        minimizedWindows.Push(this_id)  ; Add window IDs to minimized list
                         if (allMaximized)
-                            allMaximized := WinGetMinMax("ahk_id " thisID)
+                            allMaximized := WinGetMinMax("ahk_id " this_id)
                     }
                 }
             }
@@ -483,9 +508,9 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
                         }
                         else  ; If there is some window that is not maximized it will move windows one by one from the topmost to the bottommost to the bottom to achieve the same window order as at the beginning
                         {
-                            for (thisID in minimizedWindows)
+                            for (this_id in minimizedWindows)
                             {
-                                WinMoveBottom("ahk_id " thisID)
+                                WinMoveBottom("ahk_id " this_id)
                             }
                         }
                     }
@@ -533,30 +558,30 @@ SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or s
     }
     ids := WinGetNormalList()  ; Get all "normal window" IDs
     active_id := 0
-    thisID := 0
+    this_id := 0
 
     ; Iterate all IDs to find ID of the topmost window
-    for (thisID in ids)
+    for (this_id in ids)
     {
-        active_id := thisID
+        active_id := this_id
         break
     }
 
     ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
     loop ids.Length
     {
-        thisID := ids.Pop()
-        if IsOnMonitor(thisID, monitor, true)  ; Check if on the secondary (chosen) monitor
+        this_id := ids.Pop()
+        if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
         {
-            WinActivate("ahk_id " thisID)
-            if WinWaitActive("ahk_id " thisID, , 10)
+            WinActivate("ahk_id " this_id)
+            if WinWaitActive("ahk_id " this_id, , 10)
             {
                 break
             }
         }
     }
     ; Sleep 10  ; Determine for how long will the window be active (minimum is 1 for proper functioning)
-    if !IsOnMonitor(thisID, monitor, true)
+    if !IsOnMonitor(this_id, monitor, true)
         WinActivate("ahk_id " active_id)  ; Activate the window from the beginning
 }
 
