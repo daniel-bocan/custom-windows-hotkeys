@@ -15,7 +15,7 @@ Key Combination         | Description
 `Win + Ctrl + X`        | Compare selected text with clipboard; optionally replace selected text
 
 ## Aditional Features
-Script run actions that will trigger after each log on (script start) and on every wake up.  
+Script run some actions triggered by states (system start, monitor count change, entering in time interval).  
 The actions depends on whether portable mode is enabled (if there is only 1 monitor connected) or not (if there are 2 or more monitors connected).
 ### Portable mode
 - Enable Power saver Power scheme and enable Energy saver.  
@@ -26,6 +26,8 @@ The actions depends on whether portable mode is enabled (if there is only 1 moni
 - Run Discord and Spotify and move these windows to secondary or selected monitor.  
 - Run Steam and Epic Games to enable update downloads.
 - Change VS Code editor font to the deafult font (Consolas, 'Courier New', monospace).
+### Actions independent of mode
+- Change apps theme depending on time.
 
 ## Getting Started
 
@@ -71,6 +73,9 @@ Settings are stored in the `settings.ini` file. There are many things that can b
 - To change the VS Code font that will be used in **portable mode**, modify `portableVSCodeFont` variable.  
 To change the VS Code font that will be used in **home mode**, modify `homeVSCodeFont` variable.
 
+- To change the hour when **apps light theme** will be turned on, modify `lightThemeHour` variable.  
+To change the hour when **apps dark theme** will be turned on, modify `darkThemeHour` variable.
+
 - To enable/disable log on and wake up actions and hotkeys, modify variables under `ActionToggler` and `HotkeyToggler` sections.
 
 - To change hotkey key combinations, modify variables under `Hotkeys` section.
@@ -79,7 +84,7 @@ To change the VS Code font that will be used in **home mode**, modify `homeVSCod
 
 ### 5. Set up Power schemes (recommended, if you want to use them)
 In order for the script to use schemes and Energy saver, they need to be set up first.  
-It is not necessary to set this up. If they aren't set up, the script will create all the necessary schemes and can switch between them. However the Energy saver will not be used, which is the most important part, so it will be almost useless without setting this up.
+It isn't necessary to set this up. If they aren't set up, the script will create all the necessary schemes and can switch between them. However the Energy saver won't be used, which is the most important part, so it will be almost useless without setting this up.
 
 There are two schemes script use:
 - Balanced Power scheme - Default scheme, system use (already there)

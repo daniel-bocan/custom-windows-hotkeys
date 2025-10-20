@@ -10,7 +10,7 @@
 ; Win + Ctrl + X             Compare selected text with clipboard; optionally replace selected text
 
 ; Additional features:
-; Script run actions that will trigger after each log on (script start) and on every wake up
+; Script run some actions triggered by states (system start, monitor count change, entering in time interval)
 ; The actions depends on whether portable mode is enabled (if there is only 1 monitor connected)
 ; Portable mode:
 ; Enable Power saver Power scheme and enable Energy saver
@@ -21,6 +21,8 @@
 ; Run Discord and Spotify and move these windows to secondary or selected monitor
 ; Run Steam, Epic Games and Wargaming Game Center to enable update downloads
 ; Switch VS Code font to home font specified in the settings file
+; Actions independent of mode:
+; Change apps theme depending on time
 
 ; Note:
 ; Many settings can be changed in the settings.ini file, including disabling any action or hotkey and setting custom hotkey key combiantions
@@ -32,10 +34,13 @@ powerSaverGUID := IniRead("settings.ini", "Constants", "powerSaverGUID", "")  ; 
 
 ; General Settings
 monitorToSwitchWindowsOn := IniRead("settings.ini", "General", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
+lightThemeHour := Integer(IniRead("settings.ini", "General", "lightThemeHour", "7"))
+darkThemeHour := Integer(IniRead("settings.ini", "General", "darkThemeHour", "20"))
 portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "")
 homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
 
 ; Action toggler
+changeAppTheme := IniRead("settings.ini", "ActionToggler", "changeAppTheme", 1)
 changePowerPlans := IniRead("settings.ini", "ActionToggler", "changePowerPlans", 1)
 discordStart := IniRead("settings.ini", "ActionToggler", "discordStart", 1)
 spotifyStart := IniRead("settings.ini", "ActionToggler", "spotifyStart", 1)
@@ -60,13 +65,6 @@ compareTextsHotkey := IniRead("settings.ini", "Hotkeys", "compareTexts", "#^X")
 
 ; Game list
 gameList := StrSplit(IniRead("settings.ini", "GameList", , ""), '`n')
-
-; Global variables
-wasPortableEnabled := MonitorGetCount() >= 2  ; Set inverted value from the value it should be for the first OnWake() function call (log on)
-monitorOffset := 1  ; Offset solve problem when some windows in fullscreen are bigger than monitor
-groupCounter := 0  ; It is not possible to delete group so for each new minimize is necessary to make new numbered group
-minimizedWindows := []  ; Store IDs of all minimized windows (used by slow restore pair)
-played := false  ; If Spotify played or not
 
 ; Find dir which starts with start variable
 GetDirStartsWith(start)
@@ -93,32 +91,33 @@ discord_id := "ahk_exe " discord_exe
 spotify_id := "ahk_exe " spotify_exe
 steam_id := "ahk_exe " steam_exe
 
+; Global variables
+wasPortableEnabled := MonitorGetCount() >= 2  ; Set inverted value from the value it should be for the first OnWake() function call (log on)
+monitorOffset := 1  ; Offset solve problem when some windows in fullscreen are bigger than monitor
+groupCounter := 0  ; It is not possible to delete group so for each new minimize is necessary to make new numbered group
+minimizedWindows := []  ; Store IDs of all minimized windows (used by slow restore pair)
+played := false  ; If Spotify played or not
+
 DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling to get accurate window position and size
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Main
 
-if changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
+if changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
 {
-    OnWake()  ; Used on log on
+    ; Used on log on
+    OnWake()
+    ManageAppThemes()
 
-    ; Call OnWake() function when system wake up
-    last_tick := A_TickCount
-    SetTimer(CheckWake, 60000)  ; Check every 60 seconds
+    SetTimer(CheckState, 60000)  ; Check every 60 seconds
 
-    CheckWake()
+    ; Check if something important changed
+    CheckState()
     {
-        static last_tick := A_TickCount
-        current_tick := A_TickCount
-
-        ; If difference is too large, system was asleep
-        if (current_tick - last_tick > 120000)
-        {
-            OnWake()  ; Used on wake up
-        }
-
-        last_tick := current_tick
+        if ((MonitorGetCount() == 1) != wasPortableEnabled)
+            OnWake()
+        ManageAppThemes()
     }
 }
 
@@ -137,7 +136,19 @@ if compareTextsToggler
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Log on and system wake up actions
+; State-based actions
+
+; Check if theme should be changed and if yes, change it
+ManageAppThemes()
+{
+    isLightTheme := RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+    ; If current hour is in interval of light theme and dark theme is on, turn on light theme
+    if lightThemeHour <= A_hour and A_Hour < darkThemeHour and !isLightTheme
+        RegWrite("1", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+    ; If current hour is not in interval of light theme and light theme is on, turn on dark theme
+    else if (A_Hour < lightThemeHour or A_hour >= darkThemeHour) and isLightTheme
+        RegWrite("0", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+}
 
 ; Edit editor.fontFamily variable in settings.json file
 SetVSCodeFont(font)
