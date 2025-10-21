@@ -22,7 +22,7 @@
 ; Run Steam, Epic Games and Wargaming Game Center to enable update downloads
 ; Switch VS Code font to home font specified in the settings file
 ; Actions independent of mode:
-; Change apps theme depending on time
+; Change app theme based on the time of day
 
 ; Note:
 ; Many settings can be changed in the settings.ini file, including disabling any action or hotkey and setting custom hotkey key combiantions
@@ -30,12 +30,12 @@
 #Requires AutoHotkey v2.0
 
 ; Constants
-powerSaverGUID := IniRead("settings.ini", "Constants", "powerSaverGUID", "")  ; GUID of Power saver Power scheme that should be generated with setup.ahk file
+powerSaverGUID := IniRead("local_config.ini", "GUID", "powerSaverGUID", "")  ; GUID of Power saver Power scheme that should be generated with setup.ahk file
 
 ; General Settings
 monitorToSwitchWindowsOn := IniRead("settings.ini", "General", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
-lightThemeHour := Integer(IniRead("settings.ini", "General", "lightThemeHour", "7"))
-darkThemeHour := Integer(IniRead("settings.ini", "General", "darkThemeHour", "20"))
+lightThemeHour := IniRead("settings.ini", "General", "lightThemeHour", "7")
+darkThemeHour := IniRead("settings.ini", "General", "darkThemeHour", "20")
 portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "")
 homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
 
@@ -104,23 +104,17 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling 
 
 ; Main
 
+; State-based actions
 if changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
 {
     ; Used on log on
-    OnWake()
-    ManageAppThemes()
-
-    SetTimer(CheckState, 60000)  ; Check every 60 seconds
-
-    ; Check if something important changed
     CheckState()
-    {
-        if ((MonitorGetCount() == 1) != wasPortableEnabled)
-            OnWake()
-        ManageAppThemes()
-    }
+
+    ; Check states every 60 seconds
+    SetTimer(CheckState, 60000)
 }
 
+; Hotkeys
 if minimizeWindowsToggler
     Hotkey(minimizeWindowsHotkey, MinimizeWindows)
 if restoreWindowsToggler
@@ -136,7 +130,7 @@ if compareTextsToggler
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; State-based actions
+; Auxiliary functions for state-based actions
 
 ; Check if theme should be changed and if yes, change it
 ManageAppThemes()
@@ -190,28 +184,35 @@ SetVSCodeFont(font)
     file.Close()
 }
 
-OnWake()
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Main function that check states and manage state-based actions
+
+CheckState()
 {
+    ManageAppThemes()
+
     global wasPortableEnabled
 
+    ; If mode changed from home to portable
     if MonitorGetCount() == 1 && !wasPortableEnabled
     {
         ; Check if Wargaming Game Center is running every 20 seconds and if yes terminate it
         ; Also terminate Steam and  Epic Games in first iteration if it is running
         ; Terminating WGC is designed differently because Steam and Epic Games can be run in the background so they don't start at startup, but are started manually in this script. But WGC can't be run in the background so it starts at startup and then terminates here. Terminating Steam and Epic Games only occurs here if it was in home mode and is now in portable mode.
         if gameLaunchersOperations
-            SetTimer(KillWGC, 20000)
-        KillWGC()
+            SetTimer(TerminateGameLaunchers, 20000)
+        TerminateGameLaunchers()
         {
             static repeat_index := 0  ; Only in function scope
             if ProcessExist(wargaming_exe)
             {
                 ProcessClose(wargaming_exe)
-                SetTimer(KillWGC, 0)  ; Disable timer
+                SetTimer(TerminateGameLaunchers, 0)  ; Disable timer
             }
             ; If it checked 10 times, stop checking it
             else if repeat_index >= 10
-                SetTimer(KillWGC, 0)  ; Disable timer
+                SetTimer(TerminateGameLaunchers, 0)  ; Disable timer
             ; Terminate Steam and Epic Games in first iteration if it is running
             if repeat_index == 0
             {
@@ -235,6 +236,7 @@ OnWake()
             SetVSCodeFont(portableVSCodeFont)
         }
     }
+    ; If mode changed from portable to home
     else if MonitorGetCount() >= 2 && wasPortableEnabled
     {
         ; Find monitor to which the windows will be moved
@@ -253,6 +255,16 @@ OnWake()
 
         ; Get coordinates of the monitor
         MonitorGet monitor, &Left, &Top
+
+        ; Run Steam and Epic Games in background if it was not running. WGC run automatically on startup.
+        if !ProcessExist(steam_exe) && FileExist(steamPath) && gameLaunchersOperations
+        {
+            Run(steamPath " -Silent")
+            if WinWait(steam_id)
+                WinMinimize(steam_id)
+        }
+        if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
+            Run(epicgamesPath " -Silent")
 
         if !WinExist(discord_id) && FileExist(discordPath) && discordStart
         {
@@ -283,16 +295,8 @@ OnWake()
                 WinMove(Left, Top, , , spotify_id)
                 WinMaximize(spotify_id)
             }
+            WinActivate(spotify_id)
         }
-        ; Run Steam and Epic Games in background if it was not running. WGC run automatically on startup.
-        if !ProcessExist(steam_exe) && FileExist(steamPath) && gameLaunchersOperations
-        {
-            Run(steamPath " -Silent")
-            if WinWait(steam_id)
-                WinMinimize(steam_id)
-        }
-        if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
-            Run(epicgamesPath " -Silent")
 
         ; Enable Balanced Power scheme and disable Energy saver
         if powerSaverGUID != "" && changePowerPlans
@@ -553,6 +557,7 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
 
 SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or selected monitor
 {
+    ; Get monitor on which should windows switch
     if MonitorGetCount() == 1
         monitor := 1
     else if MonitorGetCount() == 2
@@ -592,7 +597,7 @@ SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or s
         }
     }
     ; Sleep 10  ; Determine for how long will the window be active (minimum is 1 for proper functioning)
-    if !IsOnMonitor(this_id, monitor, true)
+    if !IsOnMonitor(active_id, monitor, true)
         WinActivate("ahk_id " active_id)  ; Activate the window from the beginning
 }
 
