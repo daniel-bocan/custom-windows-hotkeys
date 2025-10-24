@@ -8,8 +8,8 @@ Created with AutoHotkey v2 (https://www.autohotkey.com).
 
 | Key Combination  | Description                                                                   |
 | ---------------- | ----------------------------------------------------------------------------- |
-| `Win + Alt + F`  | Minimize all windows on the primary monitor                                   |
-| `Win + Alt + H`  | Restore minimized windows on the primary monitor and activate the topmost one |
+| `Win + F`        | Minimize all windows on the primary monitor                                   |
+| `Win + H`        | Restore minimized windows on the primary monitor and activate the topmost one |
 | `Win + T`        | Mute/unmute Discord microphone and pause/play Spotify if it is playing        |
 | `Win + B`        | Switch between windows on the secondary or selected monitor                   |
 | `Win + Ctrl + C` | Append selected text to the end of clipboard with blank line between texts    |
@@ -35,6 +35,7 @@ The actions depends on whether portable mode is enabled (if there is only 1 moni
 
 ### Actions independent of mode
 
+-   Run Everything program on logon.
 -   Change app theme based on the time of day.
 
 ## Getting Started
@@ -46,7 +47,14 @@ https://www.autohotkey.com
 
 ### 2. Run the Script
 
-Double-click the `main.ahk` file to be able to use the hotkeys.
+Double-click the `main.ahk` file to be able to use the actions and hotkeys.
+
+Note: Run script with the highest privilegies if possible. Things below couldn't work well if script is running as user:
+
+- Everything won't work because it needs to be run as administrator to index NTFS volumes.
+- After using hotkey containing Win key, Start Menu could open.
+- If active window has highest privilegies, hotkeys won't work at all.
+- Operations with windows that have highest privilegies is unable and even can throw exception (for example minimizing windows that contains window with highest privilegies).
 
 ### 3. Create task in Task scheduler (recommneded)
 
@@ -55,7 +63,7 @@ Double-click the `main.ahk` file to be able to use the hotkeys.
 3. In the **General** tab:
 
     - Enter a **name** for the task (e.g., AutoHotkey Script).
-    - Enable **Run with highest privilegies** option if possible, for the script to work properly
+    - Enable **Run with highest privilegies** option if possible, for the script to work properly.
 
 4. Switch to the **Triggers** tab:
     - Click **"New..."**.
@@ -69,7 +77,7 @@ Double-click the `main.ahk` file to be able to use the hotkeys.
 6. _(Optional)_ Adjust options in the **Conditions** and **Settings** tabs as needed.
 7. Click **OK** to create the task.
 
-From now on, the `main.ahk` script will **run automatically** at **log on**, ensuring that all hotkeys are active.
+From now on, the `main.ahk` script will **run automatically** on **logon**, ensuring that all hotkeys are active.
 
 ### 4. Customize the settings file
 
@@ -87,7 +95,7 @@ Settings are stored in the `settings.ini` file. There are many things that can b
 -   To change the hour when **apps light theme** will be turned on, modify `lightThemeHour` variable.  
     To change the hour when **apps dark theme** will be turned on, modify `darkThemeHour` variable.
 
--   To enable/disable log on and wake up actions and hotkeys, modify variables under `ActionToggler` and `HotkeyToggler` sections.
+-   To enable/disable state-based and logon actions and hotkeys, modify variables under `ActionToggler` and `HotkeyToggler` sections.
 
 -   To change hotkey key combinations, modify variables under `Hotkeys` section.
 

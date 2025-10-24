@@ -2,8 +2,8 @@
 ; Licensed under GNU GPL v3.0 or later: https://www.gnu.org/licenses/gpl-3.0.html
 
 ; Hotkeys:
-; Win + Alt + F              Minimize all windows on the primary monitor
-; Win + Alt + H              Restore all minimized windows on the primary monitor and activate the topmost one
+; Win + F                    Minimize all windows on the primary monitor
+; Win + H                    Restore all minimized windows on the primary monitor and activate the topmost one
 ; Win + T                    Mute/unmute Discord microphone and pause/play Spotify if it is playing
 ; Win + B                    Switch between windows on the secondary or selected monitor
 ; Win + Ctrl + C             Append selected text to the end of clipboard with blank line between texts
@@ -22,6 +22,7 @@
 ; Run Steam, Epic Games and Wargaming Game Center to enable update downloads
 ; Switch VS Code font to home font specified in the settings file
 ; Actions independent of mode:
+; Run Everything program on logon
 ; Change app theme based on the time of day
 
 ; Note:
@@ -40,6 +41,7 @@ portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "
 homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
 
 ; Action toggler
+runEverythingOnLogon := IniRead("settings.ini", "ActionToggler", "runEverythingOnLogon", 1)
 changeAppTheme := IniRead("settings.ini", "ActionToggler", "changeAppTheme", 1)
 changePowerPlans := IniRead("settings.ini", "ActionToggler", "changePowerPlans", 1)
 discordStart := IniRead("settings.ini", "ActionToggler", "discordStart", 1)
@@ -56,8 +58,8 @@ appendClipboardToggler := IniRead("settings.ini", "HotkeyToggler", "appendClipbo
 compareTextsToggler := IniRead("settings.ini", "HotkeyToggler", "compareTexts", 1)
 
 ; Hotkeys
-minimizeWindowsHotkey := IniRead("settings.ini", "Hotkeys", "minimizeWindows", "#!F")
-restoreWindowsHotkey := IniRead("settings.ini", "Hotkeys", "restoreWindows", "#!H")
+minimizeWindowsHotkey := IniRead("settings.ini", "Hotkeys", "minimizeWindows", "#F")
+restoreWindowsHotkey := IniRead("settings.ini", "Hotkeys", "restoreWindows", "#H")
 muteUnmuteDiscordSpotifyHotkey := IniRead("settings.ini", "Hotkeys", "muteUnmuteDiscordSpotify", "#T")
 switchWindowsHotkey := IniRead("settings.ini", "Hotkeys", "switchWindows", "#B")
 appendClipboardHotkey := IniRead("settings.ini", "Hotkeys", "appendClipboard", "#^C")
@@ -76,16 +78,18 @@ GetDirStartsWith(start)
 }
 
 ; Paths, .exe names, window ids
+everything_exe := "Everything.exe"
 discord_exe := "Discord.exe"
 spotify_exe := "Spotify.exe"
 steam_exe := "Steam.exe"
 epicgames_exe := "EpicGamesLauncher.exe"
 wargaming_exe := "wgc.exe"
+everythingPath := A_ProgramFiles "\Everything\" everything_exe
 ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
 discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discord_exe
-spotifyPath := "C:\Users\" A_UserName "\AppData\Roaming\Spotify\" spotify_exe
-steamPath := "C:\Program Files (x86)\Steam\" steam_exe
-epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
+spotifyPath := A_AppData "\Spotify\" spotify_exe
+steamPath := A_ProgramFiles "\Steam\" steam_exe
+epicgamesPath := A_ProgramFiles "\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
 VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
 discord_id := "ahk_exe " discord_exe
 spotify_id := "ahk_exe " spotify_exe
@@ -105,9 +109,11 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling 
 ; Main
 
 ; State-based actions
-if changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
+if runEverythingOnLogon || changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
 {
-    ; Used on log on
+    ; Used on logon
+    if runEverythingOnLogon && !ProcessExist(everything_exe) && FileExist(everythingPath)
+        Run(everythingPath, , "Hide")
     CheckState()
 
     ; Check states every 60 seconds
@@ -169,7 +175,7 @@ SetVSCodeFont(font)
             ; Create new line with replaced value
             newLine := SubStr(line, 1, InStr(line, ":")) " " '"' font '"'
             ; If there was comma at the end add it again
-            if SubStr(Trim(line, " `t`r`n"), -1, 1) == ","
+            if SubStr(Trim(line, " `t`r`n"), -1, 1) = ","
             {
                 newLine .= ","
             }
@@ -195,7 +201,7 @@ CheckState()
     global wasPortableEnabled
 
     ; If mode changed from home to portable
-    if MonitorGetCount() == 1 && !wasPortableEnabled
+    if MonitorGetCount() = 1 && !wasPortableEnabled
     {
         ; Check if Wargaming Game Center is running every 20 seconds and if yes terminate it
         ; Also terminate Steam and  Epic Games in first iteration if it is running
@@ -214,7 +220,7 @@ CheckState()
             else if repeat_index >= 10
                 SetTimer(TerminateGameLaunchers, 0)  ; Disable timer
             ; Terminate Steam and Epic Games in first iteration if it is running
-            if repeat_index == 0
+            if repeat_index = 0
             {
                 if ProcessExist(steam_exe)
                     ProcessClose(steam_exe)
@@ -240,18 +246,15 @@ CheckState()
     else if MonitorGetCount() >= 2 && wasPortableEnabled
     {
         ; Find monitor to which the windows will be moved
-        if MonitorGetCount() == 2
+        if MonitorGetCount() = 2
         {
-            if MonitorGetPrimary() == 1
+            if MonitorGetPrimary() = 1
                 monitor := 2
             else
                 monitor := 1
         }
         else
-        {
-            global monitorToSwitchWindowsOn
             monitor := monitorToSwitchWindowsOn
-        }
 
         ; Get coordinates of the monitor
         MonitorGet monitor, &Left, &Top
@@ -280,22 +283,22 @@ CheckState()
                 WinRestore(discord_id)
                 WinMove(Left, Top, , , discord_id)
                 WinMaximize(discord_id)
+                WinActivate(discord_id)
             }
-            WinActivate(discord_id)
         }
         if !WinExist(spotify_id) && FileExist(spotifyPath) && spotifyStart
         {
             Run(spotifyPath)
             ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use this instead of Run(spotifyPath) to run spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill spotify
             ; Wait until Spotify is running and if it is not on the selected monitor, move it there
-            if WinWait(spotify_id, , 5) && !IsOnMonitor(spotify_id, monitor, true)
+            if WinWait(spotify_id) && !IsOnMonitor(spotify_id, monitor, true)
             {
                 ; Unmaximize window, move it to the selected monitor and then maximize it
                 WinRestore(spotify_id)
                 WinMove(Left, Top, , , spotify_id)
                 WinMaximize(spotify_id)
+                WinActivate(spotify_id)
             }
-            WinActivate(spotify_id)
         }
 
         ; Enable Balanced Power scheme and disable Energy saver
@@ -310,7 +313,7 @@ CheckState()
             SetVSCodeFont(homeVSCodeFont)
         }
     }
-    wasPortableEnabled := MonitorGetCount() == 1
+    wasPortableEnabled := MonitorGetCount() = 1
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -322,7 +325,7 @@ CheckState()
 WinIsNormal(id)
 {
     Style := WinGetStyle(id)
-    if (Style & 0x800000)
+    if Style & 0x800000
         return 1
     return 0
 }
@@ -332,9 +335,9 @@ WinGetNormalList()
 {
     ids := WinGetList()
     normalWindows := []
-    for (this_id in ids)
+    for this_id in ids
     {
-        if (WinIsNormal(this_id))
+        if WinIsNormal(this_id)
         {
             normalWindows.Push(this_id)
         }
@@ -346,7 +349,7 @@ WinGetNormalList()
 ContainsElement(list, target)
 {
     for element in list
-        if element == target
+        if element = target
             return true
     return false
 }
@@ -357,7 +360,7 @@ IsOnMonitor(id, monitorNumber, offsetSwitch)
 {
     global monitorOffset
     offset := monitorOffset
-    if (!offsetSwitch)
+    if !offsetSwitch
         offset := 0
     MonitorGet monitorNumber, &Left, &Top, &Right, &Bottom  ; Get coordinates of the primary monitor
     WinGetClientPos &OutX, &OutY, &OutWidth, &OutHeight, id  ; Get coordinates of window of this iteration (client pos is more accurate then window pos)
@@ -370,6 +373,39 @@ IsOnMonitor(id, monitorNumber, offsetSwitch)
 IsOnPrimaryMonitor(id, offsetSwitch)
 {
     return IsOnMonitor(id, MonitorGetPrimary(), offsetSwitch)
+}
+
+; Activate window properly (not flashing taskbar icon)
+; Dll calls ensures everything works properly. It attach the active window thread with the target window thread. After that, window can be activated without problems because it acts like it is on the same thread as the window that was active before. Without it the new window will not activate at all or not correctly and the taskbar icon will flash. This technique is used only the first time any window is activated after the script start, then it works correctly.
+WinActivateCorrectly(active_id, target_id)
+{
+    if active_id != target_id
+    {
+        static firstTime := true
+        if firstTime
+        {
+            ; Get thread IDs
+            thisThreadId := DllCall("GetWindowThreadProcessId", "ptr", active_id, "uint*", 0, "uint")
+            targetThreadId := DllCall("GetWindowThreadProcessId", "ptr", target_id, "uint*", 0, "uint")
+
+            ; Attach input threads so focus can transfer
+            DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", true)
+
+            ; Activate the target window
+            WinActivate(target_id)
+            WinWaitActive(target_id, , 10)
+
+            ; Detach again
+            DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", false)
+            firstTime := false
+        }
+        else
+        {
+            ; Activate the target window
+            WinActivate(target_id)
+            WinWaitActive(target_id, , 10)
+        }
+    }
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -386,9 +422,9 @@ MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monit
     ids := WinGetNormalList()  ; Get all "normal window" IDs
 
     ; Iterate all IDs and choose IDs of windows that are on the primary monitor and add it to group and minimized list
-    for (this_id in ids)
+    for this_id in ids
     {
-        if (IsOnPrimaryMonitor(this_id, true))  ; Check if on the primary monitor
+        if IsOnPrimaryMonitor(this_id, true)  ; Check if on the primary monitor
         {
             ; reset list of minimized windows (it can be at the start of this hotkey but if this hotkey would be activated twice in a row by mistake, the hotkey for restoration will not work)
             if !topmostWinFound
@@ -417,9 +453,9 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
     active_id := 0
 
     ; Iterate all IDs to find ID of the topmost window of the primary monitor that is not minimized (if user open window between minimization and restoration it will be active after restoration)
-    for (this_id in ids)
+    for this_id in ids
     {
-        if (IsOnPrimaryMonitor(this_id, true) && WinGetMinMax("ahk_id " this_id) != -1)  ; Check if on the primary monitor and if it's not minimized
+        if IsOnPrimaryMonitor(this_id, true) && WinGetMinMax(this_id) != -1  ; Check if on the primary monitor and if it's not minimized
         {
             active_id := this_id
             break
@@ -432,23 +468,23 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
         loop minimizedWindows.Length
         {
             this_id := minimizedWindows[-A_Index]
-            if WinExist("ahk_id " this_id) && WinGetMinMax("ahk_id " this_id) != 1
+            if WinExist(this_id) && WinGetMinMax(this_id) != 1
             {
                 GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window ID in group; comment for slow restore
-                ; WinRestore("ahk_id " thisID)  ; uncomment for slow restore
+                ; WinRestore(this_id)  ; uncomment for slow restore
             }
         }
 
         WinRestore("ahk_group MinimizeGroup" groupCounter)  ; comment for slow restore
 
         ; Activate window that was active on the primary monitor before window restoration or if there was none then activate window that was topmost before restoration
-        if active_id == 0
+        if active_id = 0
         {
             active_id := minimizedWindows[1]
         }
-        if WinExist("ahk_id " active_id)
+        if WinExist(active_id)
         {
-            WinActivate("ahk_id " active_id)
+            WinActivate(active_id)
         }
         minimizedWindows := []
     }
@@ -457,8 +493,8 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
 MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone and pause/play Spotify if it is playing
 {
     global gameList
-    discord_id := WinExist("ahk_exe Discord.exe")  ; Check if Discord is running
-    if (discord_id)
+    discord_id := WinExist("ahk_exe " discord_exe)
+    if discord_id
     {
         ; For games
         if ContainsElement(gameList, WinGetProcessName("A"))  ; Check if game is active window (compare active window .exe name with .exe names from list)
@@ -475,79 +511,68 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
             ids := WinGetNormalList()  ; Get all "normal window" IDs
             active_id := 0
 
-            ; Iterate all IDs to find ID of the topmost window
+            ; The topmost window
             active_id := ids[1]
 
             minimizedWindows := []
-            secondaryMonitor := 0
             monitor := 0
 
-            ; Find out on what monitor Discord is (only if there is one or two monitors)
-            if MonitorGetCount() <= 2
-            {
-                ; Find out on what monitor Discord is
-                if (IsOnPrimaryMonitor(discord_id, false))
-                    monitor := 1  ; I just mark primary as 1 and secondary as 2
-                else
-                    monitor := 2
+            ; Find out on what monitor Discord is
+            loop MonitorGetCount()
+                if IsOnMonitor(discord_id, A_Index, true)
+                    monitor := A_Index
 
-                ; Iterate for IDs of windows that are on the same monitor as Discord
-                allMaximized := 1
-                for (this_id in ids)
+            ; Iterate for IDs of windows that are on the same monitor as Discord
+            allMaximized := 1
+            for this_id in ids
+            {
+                if IsOnMonitor(this_id, monitor, true)
                 {
-                    if (IsOnPrimaryMonitor(this_id, true) && monitor == 1 || !IsOnPrimaryMonitor(this_id, true) &&
-                    monitor == 2)
-                    {
-                        minimizedWindows.Push(this_id)  ; Add window IDs to minimized list
-                        if (allMaximized)
-                            allMaximized := WinGetMinMax("ahk_id " this_id)
-                    }
+                    minimizedWindows.Push(this_id)  ; Add window IDs to minimized list
+                    if allMaximized
+                        allMaximized := WinGetMinMax(this_id)
                 }
             }
 
             ; Activate Discord window and send Ctrl + Shift + M hotkey to mute/unmute microphone
-            WinActivate("ahk_id " discord_id)
+            if active_id != discord_id
+            {
+                WinActivateCorrectly(active_id, discord_id)
+            }
             Send "^+m"
             Sleep 500  ; Determine for how long will Discord show (minimum is 1 for proper functioning)
 
             ; Sorting windows out
-            if (discord_id != active_id)  ; If Discord window is active it will remain active
+            if discord_id != active_id  ; If Discord window is active it will remain active
             {
-                if (MonitorGetCount() <= 2)  ; If there are 3 or more monitors it is not clear on what monitor Discord is and what windows were overlayed so it will do nothing
+                if discord_id != minimizedWindows[1]  ; If Discord window was the topmost window but not active (active window was on the other monitor) it will activate window which was active at the beginning
                 {
-                    if (discord_id != minimizedWindows[1])  ; If Discord window was the topmost window but not active (active window was on the other monitor) it will activate window which was active at the beginning
+                    if !allMaximized  ; If there is some window that is not maximized it will move windows one by one from the topmost to the bottommost to the bottom to achieve the same window order as at the beginning
                     {
-                        if (allMaximized)  ; If Discord was not the topmost window and all windows on the same monitor are maximized it will move the window to the bottom
+                        for this_id in minimizedWindows
                         {
-                            WinMoveBottom("ahk_id " discord_id)
-                        }
-                        else  ; If there is some window that is not maximized it will move windows one by one from the topmost to the bottommost to the bottom to achieve the same window order as at the beginning
-                        {
-                            for (this_id in minimizedWindows)
-                            {
-                                WinMoveBottom("ahk_id " this_id)
-                            }
+                            WinMoveBottom(this_id)
                         }
                     }
+                    WinActivateCorrectly(discord_id, minimizedWindows[1])  ; Activate the window that was the topmost window on monitor where is Discord
                 }
-                ; WinActivate(minimizedWindows[1])  ; Uncomment this if applications are freezing when they are moving to top or bottom
-                WinActivate(active_id)  ; Activate window that was active at the beginning
+                WinActivate(active_id)  ; Activate the window that was active at the beginning
             }
         }
     }
 
     ; Pause/play music on Spotify but if music wasn't stopped using this hotkey it will not play it, so it can't play music if I didn't pause it using this hotkey
     global played
-    spotify_id := WinExist("ahk_exe Spotify.exe")  ; Check if Spotify is running
-    if (spotify_id)
+    spotify_id := WinExist("ahk_exe " spotify_exe)  ; Check if Spotify is running
+    if spotify_id
     {
-        this_title := WinGetTitle("ahk_id " spotify_id)
-        if (this_title != "Spotify Free" && this_title != "Spotify Premium")  ; Check if music is playing
+        spotifyTitle := WinGetTitle(spotify_id)
+        if spotifyTitle != "Spotify Free" && spotifyTitle != "Spotify Premium"  ; Check if music is playing
         {
             Send "{Media_Play_Pause}"
             played := 1
         }
-        else if (played)  ; Check if music played before
+        else if played  ; Check if music played before
         {
             Send "{Media_Play_Pause}"
             played := 0
@@ -558,47 +583,45 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
 SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or selected monitor
 {
     ; Get monitor on which should windows switch
-    if MonitorGetCount() == 1
+    if MonitorGetCount() = 1
         monitor := 1
-    else if MonitorGetCount() == 2
+    else if MonitorGetCount() = 2
     {
-        if MonitorGetPrimary() == 1
+        if MonitorGetPrimary() = 1
             monitor := 2
         else
             monitor := 1
     }
     else
     {
-        global monitorToSwitchWindowsOn
         monitor := monitorToSwitchWindowsOn
     }
     ids := WinGetNormalList()  ; Get all "normal window" IDs
     active_id := 0
-    this_id := 0
 
     ; Iterate all IDs to find ID of the topmost window
-    for (this_id in ids)
+    for this_id in ids
     {
         active_id := this_id
         break
     }
-
-    ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
-    loop ids.Length
+    ; If there is at least one window
+    if active_id
     {
-        this_id := ids.Pop()
-        if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
+        ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
+        loop ids.Length
         {
-            WinActivate("ahk_id " this_id)
-            if WinWaitActive("ahk_id " this_id, , 10)
+            this_id := ids.Pop()
+            if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
             {
+                WinActivateCorrectly(active_id, this_id)
                 break
             }
         }
+        ; Activate the window from the beginning if it is not on the secondary monitor
+        if !IsOnMonitor(active_id, monitor, true)
+            WinActivate(active_id)
     }
-    ; Sleep 10  ; Determine for how long will the window be active (minimum is 1 for proper functioning)
-    if !IsOnMonitor(active_id, monitor, true)
-        WinActivate("ahk_id " active_id)  ; Activate the window from the beginning
 }
 
 AppendClipboard(*) ; Press Win + Ctrl + C to append selected text to the end of clipboard with blank line between texts
@@ -637,13 +660,13 @@ CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; 
     ; Make correct word endings
     FormWord(word, count)
     {
-        if (count == 1)
+        if count = 1
             return " " word
         else
             return " " word "s"
     }
 
-    if (origText == newText)
+    if origText = newText
     {
         ; Show message box with one button
         MsgBox("Texts ARE the SAME`nLength of text: " origLineCount FormWord("line", origLineCount) ", " origWordCount FormWord(
@@ -683,7 +706,7 @@ CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; 
             origLine := Trim(origLines[lineNum])
             newLine := Trim(newLines[lineNum])
 
-            if (origLine != newLine)
+            if origLine != newLine
             {
                 origWords := StrSplit(origLine, " ")
                 newWords := StrSplit(newLine, " ")
@@ -693,7 +716,7 @@ CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; 
                 loop minWords
                 {
                     wordNum := A_Index
-                    if (origWords[wordNum] != newWords[wordNum])
+                    if origWords[wordNum] != newWords[wordNum]
                     {
                         if !diffFound
                         {
@@ -762,7 +785,7 @@ CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; 
                 "char", origCharCount) "`nLength of new string: " newLineCount FormWord("line", newLineCount) ", " newWordCount FormWord(
                     "word", newWordCount) " and " newCharCount FormWord("char", newCharCount) "`nDo you want to replace original text?",
         "Texts Comparer", 256 + 4) ; 256 is for Yes/No buttons, 4 is to set the No button as default
-        if (result == "Yes")
+        if result = "Yes"
         {
             A_Clipboard := origText
             Send "^v"
