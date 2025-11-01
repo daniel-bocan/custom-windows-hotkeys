@@ -1,4 +1,4 @@
-﻿; Copyright (C) 2025 Daniel Bočan
+; Copyright (C) 2025 Daniel Bočan
 ; Licensed under GNU GPL v3.0 or later: https://www.gnu.org/licenses/gpl-3.0.html
 
 ; Hotkeys:
@@ -77,7 +77,7 @@ GetDirStartsWith(start)
     }
 }
 
-; Paths, .exe names, window ids
+; Paths, .exe names, window IDs
 everything_exe := "Everything.exe"
 discord_exe := "Discord.exe"
 spotify_exe := "Spotify.exe"
@@ -88,14 +88,16 @@ everythingPath := A_ProgramFiles "\Everything\" everything_exe
 ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
 discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discord_exe
 spotifyPath := A_AppData "\Spotify\" spotify_exe
-steamPath := A_ProgramFiles "\Steam\" steam_exe
-epicgamesPath := A_ProgramFiles "\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
+steamPath := "C:\Program Files (x86)\Steam\" steam_exe
+epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
 VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
 discord_id := "ahk_exe " discord_exe
 spotify_id := "ahk_exe " spotify_exe
 steam_id := "ahk_exe " steam_exe
 
 ; Global variables
+logon := true
+threadMergeEnabled := true
 wasPortableEnabled := MonitorGetCount() >= 2  ; Set inverted value from the value it should be for the first OnWake() function call (log on)
 monitorOffset := 1  ; Offset solve problem when some windows in fullscreen are bigger than monitor
 groupCounter := 0  ; It is not possible to delete group so for each new minimize is necessary to make new numbered group
@@ -115,79 +117,43 @@ if runEverythingOnLogon || changeAppTheme || changePowerPlans || discordStart ||
     if runEverythingOnLogon && !ProcessExist(everything_exe) && FileExist(everythingPath)
         Run(everythingPath, , "Hide")
     CheckState()
+    logon := false
 
     ; Check states every 60 seconds
     SetTimer(CheckState, 60000)
 }
 
 ; Hotkeys
+; Disable hotkeys that will be used because they are usually used by system and map hotkeys actions to hotkey release
 if minimizeWindowsToggler
-    Hotkey(minimizeWindowsHotkey, MinimizeWindows)
-if restoreWindowsToggler
-    Hotkey(restoreWindowsHotkey, RestoreWindows)
-if muteUnmuteDiscordSpotifyToggler
-    Hotkey(muteUnmuteDiscordSpotifyHotkey, MuteUnmuteDiscordSpotify)
-if switchWindowsToggler
-    Hotkey(switchWindowsHotkey, SwitchWindows)
-if appendClipboardToggler
-    Hotkey(appendClipboardHotkey, AppendClipboard)
-if compareTextsToggler
-    Hotkey(compareTextsHotkey, CompareTexts)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Auxiliary functions for state-based actions
-
-; Check if theme should be changed and if yes, change it
-ManageAppThemes()
 {
-    isLightTheme := RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
-    ; If current hour is in interval of light theme and dark theme is on, turn on light theme
-    if lightThemeHour <= A_hour and A_Hour < darkThemeHour and !isLightTheme
-        RegWrite("1", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
-    ; If current hour is not in interval of light theme and light theme is on, turn on dark theme
-    else if (A_Hour < lightThemeHour or A_hour >= darkThemeHour) and isLightTheme
-        RegWrite("0", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+    Hotkey(minimizeWindowsHotkey, Empty)
+    Hotkey(minimizeWindowsHotkey " Up", MinimizeWindows)
 }
-
-; Edit editor.fontFamily variable in settings.json file
-SetVSCodeFont(font)
+if restoreWindowsToggler
 {
-    ; Basic function that join elements of an array and add a delimiter between them
-    StrJoin(Array, Delimiter := '')
-    {
-        output := ""
-        for element in Array
-        {
-            output .= element Delimiter
-        }
-        ; Trim the last added delimiter
-        return Trim(output, Delimiter)
-    }
-
-    contentStr := FileRead(VSCodeSettingsPath, "UTF-8")
-    content := StrSplit(contentStr, '`r`n')
-    for line in content
-    {
-        ; Find line that contains "editor.fontFamily":
-        if InStr(line, '"editor.fontFamily":')
-        {
-            ; Create new line with replaced value
-            newLine := SubStr(line, 1, InStr(line, ":")) " " '"' font '"'
-            ; If there was comma at the end add it again
-            if SubStr(Trim(line, " `t`r`n"), -1, 1) = ","
-            {
-                newLine .= ","
-            }
-            ; Change old line for new line
-            content[A_Index] := newLine
-        }
-    }
-    ; Join array to string and override file content with the new string
-    contentNew := StrJoin(content, "`r`n")
-    file := FileOpen(VSCodeSettingsPath, "w", "UTF-8") ; w = write (overwrite)
-    file.Write(contentNew)
-    file.Close()
+    Hotkey(restoreWindowsHotkey, Empty)
+    Hotkey(restoreWindowsHotkey " Up", RestoreWindows)
+}
+if muteUnmuteDiscordSpotifyToggler
+{
+    Hotkey(muteUnmuteDiscordSpotifyHotkey, Empty)
+    Hotkey(muteUnmuteDiscordSpotifyHotkey " Up", MuteUnmuteDiscordSpotify)
+}
+if switchWindowsToggler
+{
+    Hotkey(switchWindowsHotkey, Empty)
+    Hotkey(switchWindowsHotkey " Up", SwitchWindows)
+}
+if appendClipboardToggler
+{
+    Hotkey(appendClipboardHotkey, Empty)
+    Hotkey(appendClipboardHotkey " Up", AppendClipboard)
+}
+if compareTextsToggler
+{
+    Hotkey(compareTextsHotkey, Empty)
+    Hotkey(compareTextsHotkey " Up", CompareTexts)
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -196,9 +162,19 @@ SetVSCodeFont(font)
 
 CheckState()
 {
-    ManageAppThemes()
-
     global wasPortableEnabled
+
+    if CheckWakeUp()
+        EnableThreadMerge()
+
+    ; Manage app themes (check if theme should be changed and if yes, change it)
+    isLightTheme := RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+    ; If current hour is in interval of light theme and dark theme is on, turn on light theme
+    if lightThemeHour <= A_hour and A_Hour < darkThemeHour and !isLightTheme
+        RegWrite("1", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+    ; If current hour is not in interval of light theme and light theme is on, turn on dark theme
+    else if (A_Hour < lightThemeHour or A_hour >= darkThemeHour) and isLightTheme
+        RegWrite("0", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
 
     ; If mode changed from home to portable
     if MonitorGetCount() = 1 && !wasPortableEnabled
@@ -245,8 +221,11 @@ CheckState()
     ; If mode changed from portable to home
     else if MonitorGetCount() >= 2 && wasPortableEnabled
     {
+        someWinActivated := false
         ; Find monitor to which the windows will be moved
-        if MonitorGetCount() = 2
+        if MonitorGetCount() = 1
+            monitor := 1
+        else if MonitorGetCount() = 2
         {
             if MonitorGetPrimary() = 1
                 monitor := 2
@@ -256,40 +235,60 @@ CheckState()
         else
             monitor := monitorToSwitchWindowsOn
 
+        ; On logon wait if user open some window
+        if logon
+            Sleep(10000)
+
+        ; Get the "normal" active window ID, if any
+        ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
+        try
+            first_active_id := WinIsNormal(WinGetID("A"))
+        catch
+            first_active_id := 0
+
         ; Get coordinates of the monitor
         MonitorGet monitor, &Left, &Top
-
-        ; Run Steam and Epic Games in background if it was not running. WGC run automatically on startup.
-        if !ProcessExist(steam_exe) && FileExist(steamPath) && gameLaunchersOperations
-        {
-            Run(steamPath " -Silent")
-            if WinWait(steam_id)
-                WinMinimize(steam_id)
-        }
-        if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
-            Run(epicgamesPath " -Silent")
 
         if !WinExist(discord_id) && FileExist(discordPath) && discordStart
         {
             wasDiscordRunning := ProcessExist(discord_exe)
             Run(discordPath)
-            ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use this instead of Run(discordPath) to run discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it kill discord
-            ; With Discord is problem that when it starts after log on, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window. If Discord was running (on system wake up) no Updater window will show, so it will not wait for Discord Updater window but directly for Discord window
+            ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use this instead of Run(discordPath) to run Discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it will kill Discord
+
+            ; With Discord is problem that when it starts after log on, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window. If Discord was running (on system wake up) no Updater window will show, so it will not wait for Discord Updater window but directly for the Discord window
             if !wasDiscordRunning && WinWait("Discord Updater") && WinWaitClose("Discord Updater") && !IsOnMonitor(
-                discord_id, monitor,
-                true) || wasDiscordRunning && WinWait(discord_id)
+                discord_id, monitor, true) || wasDiscordRunning && WinWait(discord_id) && !IsOnMonitor(
+                    discord_id, monitor, true)
             {
                 ; Unmaximize window, move it to the selected monitor and then maximize it
                 WinRestore(discord_id)
                 WinMove(Left, Top, , , discord_id)
                 WinMaximize(discord_id)
-                WinActivate(discord_id)
             }
+
+            ; Get the "normal" active window ID, if any
+            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
+            try
+                last_active_id := WinIsNormal(WinGetID("A"))
+            catch
+                last_active_id := 0
+            WinActivateCorrectly(last_active_id, WinGetID(discord_id), true, true, true)
+            Sleep(2000)  ; Wait a while to load the Discord
+            someWinActivated := true
         }
+
         if !WinExist(spotify_id) && FileExist(spotifyPath) && spotifyStart
         {
+            ; Get the "normal" active window ID, if any
+            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
+            try
+                last_active_id := WinIsNormal(WinGetID("A"))
+            catch
+                last_active_id := 0
+
             Run(spotifyPath)
-            ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use this instead of Run(spotifyPath) to run spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill spotify
+            ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use this instead of Run(spotifyPath) to run Spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill Spotify
+
             ; Wait until Spotify is running and if it is not on the selected monitor, move it there
             if WinWait(spotify_id) && !IsOnMonitor(spotify_id, monitor, true)
             {
@@ -297,9 +296,40 @@ CheckState()
                 WinRestore(spotify_id)
                 WinMove(Left, Top, , , spotify_id)
                 WinMaximize(spotify_id)
-                WinActivate(spotify_id)
             }
+
+            WinActivateCorrectly(last_active_id, WinGetID(spotify_id), true, false, false)
+            Sleep(1000)  ; Wait a while to load the Spotify
+            someWinActivated := true
         }
+
+        ; Activate the window from the beginning
+        if WinExist(first_active_id)
+        {
+            ; Get the "normal" active window ID, if any
+            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
+            try
+                last_active_id := WinIsNormal(WinGetID("A"))
+            catch
+                last_active_id := 0
+            WinActivateCorrectly(last_active_id, first_active_id, false, true, false)
+        }
+
+        ; Disable Thread merge if some window was activated (it usually disable automatically but not always, for example if only Spotify was activated)
+        if someWinActivated
+            DisableThreadMerge()
+
+        ; Run Steam and Epic Games in background if it was not running. WGC run automatically on startup.
+        if !ProcessExist(steam_exe) && FileExist(steamPath) && gameLaunchersOperations
+        {
+            Run(steamPath " -Silent")
+            ; Steam sometimes open update window, if yes minimize it
+            WinWait(steam_id)
+            if WinExist(steam_id)
+                WinMinimize(steam_id)
+        }
+        if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
+            Run(epicgamesPath " -Silent")
 
         ; Enable Balanced Power scheme and disable Energy saver
         if powerSaverGUID != "" && changePowerPlans
@@ -314,103 +344,69 @@ CheckState()
         }
     }
     wasPortableEnabled := MonitorGetCount() = 1
-}
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; Auxiliary functions for hotkeys
-
-; Checks if the window has border but I use it to check if the window is "normal window"
-; "normal window" is a window that is in foreground (minimized, maximized, restored, etc.) and not a special window on background like Program Manager, etc.
-WinIsNormal(id)
-{
-    Style := WinGetStyle(id)
-    if Style & 0x800000
-        return 1
-    return 0
-}
-
-; Returns list of all "normal window" IDs
-WinGetNormalList()
-{
-    ids := WinGetList()
-    normalWindows := []
-    for this_id in ids
+    ; Check if system woke up
+    CheckWakeUp()
     {
-        if WinIsNormal(this_id)
-        {
-            normalWindows.Push(this_id)
-        }
-    }
-    return normalWindows
-}
+        static lastTick := A_TickCount
+        currentTick := A_TickCount
 
-; Basic function that find out if list contains target element
-ContainsElement(list, target)
-{
-    for element in list
-        if element = target
+        if currentTick - lastTick > 10000
             return true
-    return false
-}
 
-; Check if window with id in parametr is on the monitor with defined monitor number
-; Option to switch offset on and off
-IsOnMonitor(id, monitorNumber, offsetSwitch)
-{
-    global monitorOffset
-    offset := monitorOffset
-    if !offsetSwitch
-        offset := 0
-    MonitorGet monitorNumber, &Left, &Top, &Right, &Bottom  ; Get coordinates of the primary monitor
-    WinGetClientPos &OutX, &OutY, &OutWidth, &OutHeight, id  ; Get coordinates of window of this iteration (client pos is more accurate then window pos)
-    return OutX < Right - offset && OutX + OutWidth > Left + offset && OutY < Bottom - offset && OutY + OutHeight > Top +
-        offset  ; Check if on the primary monitor
-}
+        lastTick := currentTick
+        return false
+    }
 
-; Check if window with id in parametr is on the primary monitor
-; Option to switch offset on and off
-IsOnPrimaryMonitor(id, offsetSwitch)
-{
-    return IsOnMonitor(id, MonitorGetPrimary(), offsetSwitch)
-}
-
-; Activate window properly (not flashing taskbar icon)
-; Dll calls ensures everything works properly. It attach the active window thread with the target window thread. After that, window can be activated without problems because it acts like it is on the same thread as the window that was active before. Without it the new window will not activate at all or not correctly and the taskbar icon will flash. This technique is used only the first time any window is activated after the script start, then it works correctly.
-WinActivateCorrectly(active_id, target_id)
-{
-    if active_id != target_id
+    ; Edit editor.fontFamily variable in settings.json file
+    SetVSCodeFont(font)
     {
-        static firstTime := true
-        if firstTime
+        ; Basic function that join elements of an array and add a delimiter between them
+        StrJoin(Array, Delimiter := '')
         {
-            ; Get thread IDs
-            thisThreadId := DllCall("GetWindowThreadProcessId", "ptr", active_id, "uint*", 0, "uint")
-            targetThreadId := DllCall("GetWindowThreadProcessId", "ptr", target_id, "uint*", 0, "uint")
-
-            ; Attach input threads so focus can transfer
-            DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", true)
-
-            ; Activate the target window
-            WinActivate(target_id)
-            WinWaitActive(target_id, , 10)
-
-            ; Detach again
-            DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", false)
-            firstTime := false
+            output := ""
+            for element in Array
+            {
+                output .= element Delimiter
+            }
+            ; Trim the last added delimiter
+            return Trim(output, Delimiter)
         }
-        else
+
+        contentStr := FileRead(VSCodeSettingsPath, "UTF-8")
+        content := StrSplit(contentStr, '`r`n')
+        for line in content
         {
-            ; Activate the target window
-            WinActivate(target_id)
-            WinWaitActive(target_id, , 10)
+            ; Find line that contains "editor.fontFamily":
+            if InStr(line, '"editor.fontFamily":')
+            {
+                ; Create new line with replaced value
+                newLine := SubStr(line, 1, InStr(line, ":")) " " '"' font '"'
+                ; If there was comma at the end add it again
+                if SubStr(Trim(line, " `t`r`n"), -1, 1) = ","
+                {
+                    newLine .= ","
+                }
+                ; Change old line for new line
+                content[A_Index] := newLine
+            }
         }
+        ; Join array to string and override file content with the new string
+        contentNew := StrJoin(content, "`r`n")
+        file := FileOpen(VSCodeSettingsPath, "w", "UTF-8") ; w = write (overwrite)
+        file.Write(contentNew)
+        file.Close()
     }
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Hotkeys
+
+Empty(*)  ; Empty hotkey that is used for disabling existing hotkeys
+{
+    return
+}
 
 MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monitor
 {
@@ -478,26 +474,28 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
         WinRestore("ahk_group MinimizeGroup" groupCounter)  ; comment for slow restore
 
         ; Activate window that was active on the primary monitor before window restoration or if there was none then activate window that was topmost before restoration
-        if active_id = 0
-        {
+        if !active_id
             active_id := minimizedWindows[1]
-        }
         if WinExist(active_id)
-        {
             WinActivate(active_id)
-        }
         minimizedWindows := []
     }
 }
 
 MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone and pause/play Spotify if it is playing
 {
-    global gameList
     discord_id := WinExist("ahk_exe " discord_exe)
     if discord_id
     {
+        ids := WinGetNormalList()  ; Get all "normal window" IDs
+
+        try
+            active_exe := WinGetProcessName("A")  ; Get .exe file name of the active window
+        catch
+            active_exe := WinGetProcessName(ids[1])  ; Get .exe file name of the topmost window (sometimes "A" is not found)
+
         ; For games
-        if ContainsElement(gameList, WinGetProcessName("A"))  ; Check if game is active window (compare active window .exe name with .exe names from list)
+        if ContainsElement(gameList, active_exe)  ; Check if game is active window (compare active window .exe name with .exe names from list)
         {
             Send "+;"
             Sleep 500
@@ -508,11 +506,16 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
         ; For other apps
         else
         {
-            ids := WinGetNormalList()  ; Get all "normal window" IDs
-            active_id := 0
-
-            ; The topmost window
-            active_id := ids[1]
+            ; Get the "normal" active window ID, if any
+            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will set the topmost window as active, if it is
+            try
+                first_active_id := WinIsNormal(WinGetID("A"))
+            catch
+            {
+                first_active_id := ids[1]
+                if !WinActive(first_active_id)
+                    first_active_id := 0
+            }
 
             minimizedWindows := []
             monitor := 0
@@ -535,15 +538,15 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
             }
 
             ; Activate Discord window and send Ctrl + Shift + M hotkey to mute/unmute microphone
-            if active_id != discord_id
+            if first_active_id != discord_id
             {
-                WinActivateCorrectly(active_id, discord_id)
+                WinActivateCorrectly(first_active_id, discord_id, true, false, false)
             }
             Send "^+m"
             Sleep 500  ; Determine for how long will Discord show (minimum is 1 for proper functioning)
 
             ; Sorting windows out
-            if discord_id != active_id  ; If Discord window is active it will remain active
+            if discord_id != first_active_id  ; If Discord window is active it will remain active
             {
                 if discord_id != minimizedWindows[1]  ; If Discord window was the topmost window but not active (active window was on the other monitor) it will activate window which was active at the beginning
                 {
@@ -554,9 +557,16 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
                             WinMoveBottom(this_id)
                         }
                     }
-                    WinActivateCorrectly(discord_id, minimizedWindows[1])  ; Activate the window that was the topmost window on monitor where is Discord
+                    WinActivateCorrectly(discord_id, minimizedWindows[1], true, false, false)  ; Activate the window that was the topmost window on monitor where is Discord
                 }
-                WinActivate(active_id)  ; Activate the window that was active at the beginning
+
+                ; Get the "normal" active window ID, if any
+                ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
+                try
+                    last_active_id := WinIsNormal(WinGetID("A"))
+                catch
+                    last_active_id := 0
+                WinActivateCorrectly(last_active_id, first_active_id, false, true, false)  ; Activate the window that was active at the beginning
             }
         }
     }
@@ -596,32 +606,30 @@ SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or s
     {
         monitor := monitorToSwitchWindowsOn
     }
-    ids := WinGetNormalList()  ; Get all "normal window" IDs
-    active_id := 0
 
-    ; Iterate all IDs to find ID of the topmost window
-    for this_id in ids
+    ids := WinGetNormalList()  ; Get all "normal window" IDs
+    this_id := 0
+
+    ; Get the "normal" active window ID, if any
+    ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
+    try
+        active_id := WinIsNormal(WinGetID("A"))
+    catch
+        active_id := 0
+
+    ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
+    loop ids.Length
     {
-        active_id := this_id
-        break
-    }
-    ; If there is at least one window
-    if active_id
-    {
-        ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
-        loop ids.Length
+        this_id := ids.Pop()
+        if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
         {
-            this_id := ids.Pop()
-            if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
-            {
-                WinActivateCorrectly(active_id, this_id)
-                break
-            }
+            WinActivateCorrectly(active_id, this_id, true, false, false)
+            break
         }
-        ; Activate the window from the beginning if it is not on the secondary monitor
-        if !IsOnMonitor(active_id, monitor, true)
-            WinActivate(active_id)
     }
+    ; Activate the window from the beginning if it is not on the secondary monitor
+    if active_id && !IsOnMonitor(active_id, monitor, true)
+        WinActivateCorrectly(this_id, active_id, false, true, false)
 }
 
 AppendClipboard(*) ; Press Win + Ctrl + C to append selected text to the end of clipboard with blank line between texts
@@ -794,4 +802,192 @@ CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; 
         }
     }
     A_Clipboard := origText ; Restore copied text
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Utility functions
+
+/**
+ * @description Checks if the window has border but I use it to check if the window is "normal window".  
+ * "Normal window" is a window that is in foreground (minimized, maximized, restored, etc.) and not a special window on background like Program Manager, etc.
+ * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} WinTitle  
+ * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
+ * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
+ * Window title is optional and must come before any `ahk_` criteria.  
+ * If WinTitle is the letter `A`, the active window is used.  
+ * @returns {(Integer)}  
+ * The ID of the specified window.
+ * If the window is not "normal" or id is 0 or does not exist, 0 is returned.
+ */
+WinIsNormal(WinTitle)
+{
+    if !WinTitle
+        return 0
+    try
+        style := WinGetStyle(WinTitle)
+    catch
+        return 0
+    if style & 0x800000
+        return WinTitle
+    return 0
+}
+
+/**
+ * @description Returns the unique ID numbers of all "normal" windows.  
+ * If window is "normal" is determined by WinIsNormal function.
+ * @returns {(Array)}  
+ * An array containing the ID of every "normal" window.  
+ * The order of windows is from topmost to bottommost (z-order).  
+ * If no windows are matched, the array is empty.  
+ */
+WinGetNormalList()
+{
+    ids := WinGetList()
+    normalWindows := []
+    for this_id in ids
+    {
+        if WinIsNormal(this_id)
+            normalWindows.Push(this_id)
+    }
+    return normalWindows
+}
+
+/**
+ * @description Searches inside an array for an instance of the provided element.
+ * @param {(Array)} List The list to search inside of.
+ * @param {(Any)} Target The element to search for.
+ * @returns {(Integer)}  
+ * 1 if found, 0 if not
+ */
+ContainsElement(List, Target)
+{
+    for element in List
+        if element = target
+            return true
+    return false
+}
+
+/**
+ * @description Finds if window is on specified monitor.
+ * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} WinTitle  
+ * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
+ * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
+ * Window title is optional and must come before any `ahk_` criteria.  
+ * If WinTitle is the letter `A`, the active window is used.  
+ * @param {(Integer)} MonitorNumber The monitor number to check if it contains a window.
+ * @param {(Integer)} OffsetSwitch If the global offset should be used when finding the window.
+ * @returns {(Integer)}  
+ * 1 if found, 0 if not
+ */
+IsOnMonitor(WinTitle, MonitorNumber, OffsetSwitch)
+{
+    global monitorOffset
+    offset := monitorOffset
+    if !OffsetSwitch
+        offset := 0
+    MonitorGet MonitorNumber, &Left, &Top, &Right, &Bottom  ; Get coordinates of the primary monitor
+    WinGetClientPos &OutX, &OutY, &OutWidth, &OutHeight, WinTitle  ; Get coordinates of window of this iteration (client pos is more accurate then window pos)
+    return OutX < Right - offset && OutX + OutWidth > Left + offset && OutY < Bottom - offset && OutY + OutHeight > Top +
+        offset  ; Check if on the primary monitor
+}
+
+/**
+ * @description Finds if window is on the primary monitor. Uses the IsOnMonitor function.
+ * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} WinTitle  
+ * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
+ * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
+ * Window title is optional and must come before any `ahk_` criteria.  
+ * If WinTitle is the letter `A`, the active window is used.  
+ * @param {(Integer)} OffsetSwitch If the global offset should be used when finding the window.
+ * @returns {(Integer)}  
+ * 1 if found, 0 if not
+ */
+IsOnPrimaryMonitor(WinTitle, OffsetSwitch)
+{
+    return IsOnMonitor(WinTitle, MonitorGetPrimary(), OffsetSwitch)
+}
+
+/**
+ * @description  
+ * Activate window properly (not flashing taskbar icon).  
+ * It attach the active window thread with the target window thread. After that, window can be activated without problems because it acts like it is on the same thread as the window that was active before. Without it the new window will not activate at all or not correctly and the taskbar icon will flash. This technique is used only the first time any window is activated after the script start, then it works correctly without the Thread merge.
+ * @param {(Integer)} Active_id  
+ * ID of currently active window.  
+ * If 0, Thread merging will not be used.
+ * @param {(Integer)} Target_id  
+ * ID of window that will be activated.
+ * If 0, nothing will happen.
+ * @param {(Integer)} Wait If script should wait to window be active.
+ * @param {(Integer)} DisableThreadMerging If the Thread merging should be disabled after this activation.
+ * @param {(Integer)} [ActivateActive] If the window should activate even if it looks like it is already active.
+ */
+WinActivateCorrectly(Active_id, Target_id, Wait, DisableThreadMerging, ActivateActive := 0)
+{
+    ; If target id is 0, do nothing
+    if !Target_id
+        return
+
+    ; If active id is 0, do activate target window normally
+    if !Active_id
+    {
+        WinActivateNormally()
+
+        if DisableThreadMerging
+            DisableThreadMerge()
+        return
+    }
+
+    ; Do anyting only if target and active ids are different or if active window can be activated and active window is not Start menu (it blocks activation)
+    if (ActivateActive || Active_id != Target_id) && WinGetTitle(Active_id) != "Start"
+    {
+        if threadMergeEnabled && Active_id != Target_id
+            WinActivateWithThreadMerge()
+        else
+            WinActivateNormally()
+
+        if DisableThreadMerging
+            DisableThreadMerge()
+    }
+
+    WinActivateNormally()
+    {
+        WinActivate(Target_id)
+        if Wait
+            WinWaitActive(Target_id, , 10)
+    }
+
+    WinActivateWithThreadMerge()
+    {
+        ; Get thread IDs
+        thisThreadId := DllCall("GetWindowThreadProcessId", "ptr", Active_id, "uint*", 0, "uint")
+        targetThreadId := DllCall("GetWindowThreadProcessId", "ptr", Target_id, "uint*", 0, "uint")
+
+        ; Attach input threads so focus can transfer
+        DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", true)
+
+        ; Activate the target window
+        WinActivateNormally()
+
+        ; Detach again
+        DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", false)
+    }
+}
+
+/**
+ * @description Enable Thread merge which is used in WinActivateCorrectly function.
+ */
+EnableThreadMerge()
+{
+    global threadMergeEnabled
+    threadMergeEnabled := true
+}
+
+/**
+ * @description Disable Thread merge which is used in WinActivateCorrectly function.
+ */
+DisableThreadMerge()
+{
+    global threadMergeEnabled
+    threadMergeEnabled := false
 }
