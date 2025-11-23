@@ -36,7 +36,7 @@ The actions depends on whether portable mode is enabled (if there is only 1 moni
 ### Actions independent of mode
 
 -   Run Everything program on logon.
--   Change app theme based on the time of day.
+-   Change app theme based on sunrise and sunset time or on times set in settings.
 
 ## Getting Started
 
@@ -51,12 +51,12 @@ Double-click the `main.ahk` file to be able to use the actions and hotkeys.
 
 Note: Run script with the highest privilegies if possible. Things below couldn't work well if script is running as user:
 
-- Everything won't work because it needs to be run as administrator to index NTFS volumes.
-- After using hotkey containing Win key, Start Menu could open.
-- If active window has highest privilegies, hotkeys won't work at all.
-- Operations with windows that have highest privilegies is unable and even can throw exception (for example minimizing windows that contains window with highest privilegies).
+-   Everything won't work because it needs to be run as administrator to index NTFS volumes.
+-   After using hotkey containing Win key, Start Menu could open.
+-   If active window has highest privilegies, hotkeys won't work at all.
+-   Operations with windows that have highest privilegies is unable and even can throw exception (for example minimizing windows that contains window with highest privilegies).
 
-### 3. Create task in Task scheduler (recommneded)
+### 3. Create task in Task scheduler (recommended)
 
 1. Press `Win + R`, type `taskschd.msc` and press **Enter** to open the **Task Scheduler**.
 2. In the **right-hand panel**, click **"Create Task..."**.
@@ -79,9 +79,11 @@ Note: Run script with the highest privilegies if possible. Things below couldn't
 
 From now on, the `main.ahk` script will **run automatically** on **logon**, ensuring that all hotkeys are active.
 
-### 4. Customize the settings file
+### 4. Customize the settings
 
 Settings are stored in the `settings.ini` file. There are many things that can be set.
+
+#### General
 
 -   To change the monitor used by the `Win + B` hotkey (for switching windows) and logon actions (Discord and Spotify move), modify the `monitorToSwitchWindowsOn` variable.
 
@@ -92,12 +94,36 @@ Settings are stored in the `settings.ini` file. There are many things that can b
 -   To change the VS Code font that will be used in **portable mode**, modify `portableVSCodeFont` variable.  
     To change the VS Code font that will be used in **home mode**, modify `homeVSCodeFont` variable.
 
--   To change the hour when **apps light theme** will be turned on, modify `lightThemeHour` variable.  
-    To change the hour when **apps dark theme** will be turned on, modify `darkThemeHour` variable.
+#### App Theme
+
+App theme can change based on sunrise and sunset times or based on fixed times. Set the app theme change type using `useSunriseSunset` variable.
+
+If change app theme should be based on **sunrise and sunset times**, set settings below:
+
+-   Set **home** latitude, longitude and timezone shift:
+    -   Set home latitude and longitude using `homeLatitude` and `homeLongitude` variables. Latitude and longitude are used to calculate sunrise and sunset times.
+    -   Set home timezone shift using `homeTimezoneShift` variable. Timezone shift is used to handle Daylight saving time and travel to different timezones.
+    -   Calculating sunrise and sunset times while far away from home is done using timezone difference but it is accurate only if travel in similar latitude as home. To calculate sunrise and sunset times
+    
+-   Set **travel** latitude, longitude and timezone shift:
+    -   Calculating sunrise and sunset times while far away from home is done using timezone difference but it is accurate only if latitude of travel destination is similar as home latitude.  
+    To calculate sunrise and sunset times accurately everywhere while travel set latitude, longitude and timezone shift of travel destination where using `travelLatitude`, `travelLongitude` and `travelTimezoneShift` variables.
+    -   To switch whether use home and travel variables, modify `useTravelMode` variable.
+
+If change app theme should be based on **fixed times**, set settings below:
+
+-   To change the **app light theme** activation hour, modify `lightThemeHour` variable.
+-   To change the **app dark theme** activation hour, modify `darkThemeHour` variable.
+
+#### Action and Hotkey toggle
 
 -   To enable/disable state-based and logon actions and hotkeys, modify variables under `ActionToggler` and `HotkeyToggler` sections.
 
+#### Hotkey mapping
+
 -   To change hotkey key combinations, modify variables under `Hotkeys` section.
+
+#### Game list
 
 -   Add games that support **Discord's overlay** to the `gameList` section to enable proper detection and handling. List each game’s `.exe` file name **on a separate line**.
 

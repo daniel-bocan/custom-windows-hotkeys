@@ -13,32 +13,42 @@
 ; Script run some actions triggered by states (system start, monitor count change, entering in time interval)
 ; The actions depends on whether portable mode is enabled (if there is only 1 monitor connected)
 ; Portable mode:
-; Enable Power saver Power scheme and enable Energy saver
-; Terminate Steam, Epic Games and Wargaming Game Center to disable update downloads
-; Switch VS Code font to portable font specified in the settings file
+    ; Enable Power saver Power scheme and enable Energy saver
+    ; Terminate Steam, Epic Games and Wargaming Game Center to disable update downloads
+    ; Switch VS Code font to portable font specified in the settings file
 ; Home mode:
-; Enable Balanced Power scheme and disable Energy saver
-; Run Discord and Spotify and move these windows to secondary or selected monitor
-; Run Steam, Epic Games and Wargaming Game Center to enable update downloads
-; Switch VS Code font to home font specified in the settings file
+    ; Enable Balanced Power scheme and disable Energy saver
+    ; Run Discord and Spotify and move these windows to secondary or selected monitor
+    ; Run Steam, Epic Games and Wargaming Game Center to enable update downloads
+    ; Switch VS Code font to home font specified in the settings file
 ; Actions independent of mode:
-; Run Everything program on logon
-; Change app theme based on the time of day
+    ; Run Everything program on logon
+    ; Change app theme based on sunrise and sunset time or on times set in settings
 
 ; Note:
 ; Many settings can be changed in the settings.ini file, including disabling any action or hotkey and setting custom hotkey key combiantions
 
 #Requires AutoHotkey v2.0
 
-; Constants
+; Power saver GUID
 powerSaverGUID := IniRead("local_config.ini", "GUID", "powerSaverGUID", "")  ; GUID of Power saver Power scheme that should be generated with setup.ahk file
 
-; General Settings
+; General settings
 monitorToSwitchWindowsOn := IniRead("settings.ini", "General", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
-lightThemeHour := IniRead("settings.ini", "General", "lightThemeHour", "7")
-darkThemeHour := IniRead("settings.ini", "General", "darkThemeHour", "20")
 portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "")
 homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
+
+; App theme settings
+useSunriseSunset := IniRead("settings.ini", "AppTheme", "useSunriseSunset", 0)
+useTravelMode := IniRead("settings.ini", "AppTheme", "useTravelMode", 0)
+homeLatitude := IniRead("settings.ini", "AppTheme", "homeLatitude", 0)
+homeLongitude := IniRead("settings.ini", "AppTheme", "homeLongitude", 0)
+homeTimezoneShift := IniRead("settings.ini", "AppTheme", "homeTimezoneShift", 0)
+travelLatitude := IniRead("settings.ini", "AppTheme", "travelLatitude", 0)
+travelLongitude := IniRead("settings.ini", "AppTheme", "travelLongitude", 0)
+travelTimezoneShift := IniRead("settings.ini", "AppTheme", "travelTimezoneShift", 0)
+lightThemeHour := IniRead("settings.ini", "AppTheme", "defaultLightThemeHour", 7)
+darkThemeHour := IniRead("settings.ini", "AppTheme", "defaultDarkThemeHour", 20)
 
 ; Action toggler
 runEverythingOnLogon := IniRead("settings.ini", "ActionToggler", "runEverythingOnLogon", 1)
@@ -94,6 +104,9 @@ VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
 discord_id := "ahk_exe " discord_exe
 spotify_id := "ahk_exe " spotify_exe
 steam_id := "ahk_exe " steam_exe
+
+; Constants
+Pi := 3.14159265359
 
 ; Global variables
 logon := true
@@ -159,7 +172,6 @@ if compareTextsToggler
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Main function that check states and manage state-based actions
-
 CheckState()
 {
     global wasPortableEnabled
@@ -168,13 +180,7 @@ CheckState()
         EnableThreadMerge()
 
     ; Manage app themes (check if theme should be changed and if yes, change it)
-    isLightTheme := RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
-    ; If current hour is in interval of light theme and dark theme is on, turn on light theme
-    if lightThemeHour <= A_hour and A_Hour < darkThemeHour and !isLightTheme
-        RegWrite("1", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
-    ; If current hour is not in interval of light theme and light theme is on, turn on dark theme
-    else if (A_Hour < lightThemeHour or A_hour >= darkThemeHour) and isLightTheme
-        RegWrite("0", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+    ManageAppTheme()
 
     ; If mode changed from home to portable
     if MonitorGetCount() = 1 && !wasPortableEnabled
@@ -221,6 +227,19 @@ CheckState()
     ; If mode changed from portable to home
     else if MonitorGetCount() >= 2 && wasPortableEnabled
     {
+        ; Enable Balanced Power scheme and disable Energy saver
+        if powerSaverGUID != "" && changePowerPlans
+        {
+            ; Run cmd in background
+            Run("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e", , "Hide")
+        }
+
+        ; Change VS Code font
+        if homeVSCodeFont != "" && VSCodeFontChange
+        {
+            SetVSCodeFont(homeVSCodeFont)
+        }
+
         someWinActivated := false
         ; Find monitor to which the windows will be moved
         if MonitorGetCount() = 1
@@ -330,19 +349,8 @@ CheckState()
         }
         if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
             Run(epicgamesPath " -Silent")
-
-        ; Enable Balanced Power scheme and disable Energy saver
-        if powerSaverGUID != "" && changePowerPlans
-        {
-            ; Run cmd in background
-            Run("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e", , "Hide")
-        }
-        ; Change VS Code font
-        if homeVSCodeFont != "" && VSCodeFontChange
-        {
-            SetVSCodeFont(homeVSCodeFont)
-        }
     }
+
     wasPortableEnabled := MonitorGetCount() = 1
 
     ; Check if system woke up
@@ -356,6 +364,223 @@ CheckState()
 
         lastTick := currentTick
         return false
+    }
+
+    ; Manage app themes (check if theme should be changed and if yes, change it)
+    ManageAppTheme()
+    {
+        ; If light theme is active
+        isLightTheme := RegRead("HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+
+        ; If light theme should be active
+        shouldBeLightTheme := ShouldLightThemeBeActive()
+
+        if shouldBeLightTheme && !isLightTheme
+            RegWrite("1", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+        else if !shouldBeLightTheme && isLightTheme
+            RegWrite("0", "REG_DWORD", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme")
+
+        ; Check if app theme should be light, if yes return 1, otherwise return 0
+        ShouldLightThemeBeActive()
+        {
+            ; If sunrise and sunset date and times should be used to change app theme
+            if useSunriseSunset
+            {
+                ; Current UTC date and time
+                nowUTC := A_NowUTC
+
+                ; Get sunrise and sunset UTC date and times
+                ; Set current UTC date as last checked sunrise and sunset date
+                if logon
+                {
+                    sunriseSunset := CalculateSunriseSunset()
+                    static sunrise := sunriseSunset[1]
+                    static sunset := sunriseSunset[2]
+                    static lastCheckedSrSsDate := FormatTime(nowUTC, "yyyyMMdd")
+                }
+
+                ; Current UTC date
+                dateUTC := FormatTime(nowUTC, "yyyyMMdd")
+                ; If current UTC date is not same as UTC date of last sunrise and sunset check, update sunrise and sunset date and time
+                if dateUTC != lastCheckedSrSsDate
+                {
+                    sunriseSunset := CalculateSunriseSunset()
+                    sunrise := sunriseSunset[1]
+                    sunset := sunriseSunset[2]
+                }
+
+                ; If sunrise is 0, there is no sun all day (polar night)
+                if sunrise = 0
+                    return 0
+                ; If sunrise is 1, there is only sun all day (midnight sun)
+                else if sunrise = 1
+                    return 1
+
+                ; If sunrise is before sunset, sun will shine between them
+                ; Note: Sunrise is logically always before sunset but if sunrise is out of day range, script will use sunrise from day after this to both sunrise and sunset be in this day (analogously it works if sunset is out of day range)
+                if sunrise < sunset
+                {
+                    if sunrise < nowUTC && nowUTC < sunset
+                        return 1
+                    else
+                        return 0
+                }
+                else
+                {
+                    if sunset < nowUTC && nowUTC < sunrise
+                        return 0
+                    else
+                        return 1
+                }
+            }
+            ; If fixed hours should be used to change app theme
+            else
+            {
+                ; If the light theme activation hour is before the dark theme activation hour
+                if lightThemeHour < darkThemeHour
+                {
+                    if lightThemeHour <= A_Hour && A_Hour < darkThemeHour
+                        return 1
+                    else
+                        return 0
+                }
+                else
+                {
+                    if darkThemeHour <= A_Hour && A_Hour < lightThemeHour
+                        return 0
+                    else
+                        return 1
+                }
+            }
+
+            ; Calculate sunrise and sunset UTC date and times from latitude and longitude from settings file and return that values as Array in YYYYMMDDHH24MISS format
+            CalculateSunriseSunset()
+            {
+                ; If the travel mode should be used
+                if useTravelMode
+                {
+                    latitude := travelLatitude
+                    longitude := travelLongitude
+                    timezoneShift := travelTimezoneShift
+                }
+                ; If the home mode should be used
+                else
+                {
+                    latitude := homeLatitude
+                    longitude := homeLongitude
+                    timezoneShift := homeTimezoneShift
+                }
+    
+                ; Change longitude depending on timezone diff (if user traveled in other timezone then default or if Daylight saving time was turned off/on)
+                timezoneDiff := GetTimezoneShift() - timezoneShift  ; Difference between timezone shift from this place (value from settings file) and current timezone shift (difference between current date time and UTC date time)
+                longitude += timezoneDiff * 15  ; Change longitude (timezone diff * 15 is approximately 1 hour)
+    
+                nowUTC := A_NowUTC  ; Current UTC date and time
+                dayOfYear := FormatTime(nowUTC, "YDay")
+                srSsMin := CalculateSrSsMin(latitude, longitude, dayOfYear)  ; sunrise and sunset UTC time from midnight in minutes
+                sunriseMin := srSsMin[1]
+                sunsetMin := srSsMin[2]
+    
+                ; If no sun all day (polar night) or only sun all day (midnight sun)
+                if sunriseMin = 0 && sunsetMin = 0 || sunriseMin = 1 && sunsetMin = 1
+                    return [sunriseMin, sunsetMin]
+    
+                ; If sunrise was day before this, calculate sunrise from next day and use it if next day is sunrise (if not, just move the original calculated sunrise by 24 hours)
+                if sunriseMin < 0
+                {
+                    dayOfYear := FormatTime(DateAdd(nowUTC, 1, "Days"), "YDay")
+                    srSsMin := CalculateSrSsMin(latitude, longitude, dayOfYear)
+                    ; Move original calculated sunrise by 24 hours
+                    if srSsMin[1] = 0 && srSsMin[2] = 0 || srSsMin[1] = 1 && srSsMin[2] = 1
+                        sunriseMin += 24 * 60
+                    ; Use new calculated sunrise from next day
+                    else
+                        sunriseMin := srSsMin[1]
+                }
+                ; Similar as above - sunset is next day (not this)
+                else if sunsetMin > 24 * 60
+                {
+                    dayOfYear := FormatTime(DateAdd(nowUTC, -1, "Days"), "YDay")
+                    srSsMin := CalculateSrSsMin(latitude, longitude, dayOfYear)
+                    if srSsMin[1] = 0 && srSsMin[2] = 0 || srSsMin[1] = 1 && srSsMin[2] = 1
+                        sunsetMin -= 24 * 60
+                    else
+                    {
+                        sunsetMin := srSsMin[2]
+                    }
+                }
+    
+                ; Calculate hours, minutes and seconds from minutes
+                srHour := Floor(sunriseMin / 60)
+                srMin := Floor(sunriseMin - srHour * 60)
+                srSec := Round((sunriseMin - srHour * 60 - srMin) * 60)
+                ssHour := Floor(sunsetMin / 60)
+                ssMin := Floor(sunsetMin - ssHour * 60)
+                ssSec := Round((sunsetMin - ssHour * 60 - ssMin) * 60)
+    
+                ; Join today date with sunrise/sunset times to get YYYYMMDDHH24MISS format
+                sunrise := FormatTime(A_NowUTC, "yyyyMMdd") Format("{:02}{:02}{:02}", srHour, srMin, srSec)
+                sunset := FormatTime(A_NowUTC, "yyyyMMdd") Format("{:02}{:02}{:02}", ssHour, ssMin, ssSec)
+                return [sunrise, sunset]
+    
+                ; Calculate current timezone shift (difference between current date time and UTC date time)
+                GetTimezoneShift() => DateDiff(A_Now, A_NowUTC, "Hours")
+    
+                ; Calculate sunrise and sunset UTC time from midnight in minutes from latitude, longitude and day of year and return that values as Array
+                CalculateSrSsMin(latitude, longitude, dayOfYear)
+                {
+                    ; Calculate fractional year gamma (in radians)
+                    gamma := 2 * Pi / 365 * (dayOfYear - 1 + ((12 - 12) / 24))  ; Assuming noon for simplicity
+    
+                    ; Equation of time (in minutes)
+                    eqtime := 229.18 * (
+                        0.000075
+                        + 0.001868 * Cos(gamma)
+                        - 0.032077 * Sin(gamma)
+                        - 0.014615 * Cos(2 * gamma)
+                        - 0.040849 * Sin(2 * gamma)
+                    )
+    
+                    ; Solar declination (in radians)
+                    decl := (
+                        0.006918
+                        - 0.399912 * Cos(gamma)
+                        + 0.070257 * Sin(gamma)
+                        - 0.006758 * Cos(2 * gamma)
+                        + 0.000907 * Sin(2 * gamma)
+                        - 0.002697 * Cos(3 * gamma)
+                        + 0.00148 * Sin(3 * gamma)
+                    )
+    
+                    latRad := Rad(latitude)
+                    zenith := Rad(90.833)  ; Standard refraction + solar radius correction
+                    cosH := (Cos(zenith) - Sin(latRad) * Sin(decl)) / (Cos(latRad) * Cos(decl))  ; Cosine of the hour angle
+    
+                    ; Can't calculate sunrise/sunset if cosH isn't between -1 and 1 (midnight sun or polar night)
+                    if cosH > 1
+                        return [0, 0]
+    
+                    if cosH < -1
+                        return [1, 1]
+    
+                    ; Hour angle for sunrise/sunset (in radians)
+                    ha := Acos(cosH)
+    
+                    ; Solar noon (in minutes)
+                    solarNoon := 720 - 4 * longitude - eqtime
+    
+                    ; Calculate sunrise/sunset times in minutes from midnight UTC
+                    sunriseMin := solarNoon - (Deg(ha) * 4)
+                    sunsetMin := solarNoon + (Deg(ha) * 4)
+    
+                    return [sunriseMin, sunsetMin]
+    
+                    ; Convert radians from degrees and vice versa
+                    Rad(deg) => deg * (Pi / 180)
+                    Deg(rad) => rad * (180 / Pi)
+                }
+            }
+        }
     }
 
     ; Edit editor.fontFamily variable in settings.json file
