@@ -275,14 +275,37 @@ CheckState()
             ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use this instead of Run(discordPath) to run Discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it will kill Discord
 
             ; With Discord is problem that when it starts after log on, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window. If Discord was running (on system wake up) no Updater window will show, so it will not wait for Discord Updater window but directly for the Discord window
-            if !wasDiscordRunning && WinWait("Discord Updater") && WinWaitClose("Discord Updater") && !IsOnMonitor(
-                discord_id, monitor, true) || wasDiscordRunning && WinWait(discord_id) && !IsOnMonitor(
-                    discord_id, monitor, true)
+            if !wasDiscordRunning
             {
-                ; Unmaximize window, move it to the selected monitor and then maximize it
-                WinRestore(discord_id)
-                WinMove(Left, Top, , , discord_id)
-                WinMaximize(discord_id)
+                ; Wait for Discord Updater window to open and then wait to close
+                if WinWait("Discord Updater", , 10)
+                    WinWaitClose("Discord Updater", , 60)
+
+                ; Wait for Discord window but with different title then Discord Updater
+                if WinWait(discord_id, , 30, "Discord Updater")
+                {
+                    if !IsOnMonitor(discord_id, monitor, true)
+                    {
+                        ; Unmaximize window, move it to the selected monitor and then maximize it
+                        WinRestore(discord_id)
+                        WinMove(Left, Top, , , discord_id)
+                        WinMaximize(discord_id)
+                    }
+                }
+            }
+            else
+            {
+                ; Wait for any Discord window
+                if WinWait(discord_id, , 30)
+                {
+                    if !IsOnMonitor(discord_id, monitor, true)
+                    {
+                        ; Unmaximize window, move it to the selected monitor and then maximize it
+                        WinRestore(discord_id)
+                        WinMove(Left, Top, , , discord_id)
+                        WinMaximize(discord_id)
+                    }
+                }
             }
 
             ; Get the "normal" active window ID, if any
@@ -470,21 +493,21 @@ CheckState()
                     longitude := homeLongitude
                     timezoneShift := homeTimezoneShift
                 }
-    
+
                 ; Change longitude depending on timezone diff (if user traveled in other timezone then default or if Daylight saving time was turned off/on)
                 timezoneDiff := GetTimezoneShift() - timezoneShift  ; Difference between timezone shift from this place (value from settings file) and current timezone shift (difference between current date time and UTC date time)
                 longitude += timezoneDiff * 15  ; Change longitude (timezone diff * 15 is approximately 1 hour)
-    
+
                 nowUTC := A_NowUTC  ; Current UTC date and time
                 dayOfYear := FormatTime(nowUTC, "YDay")
                 srSsMin := CalculateSrSsMin(latitude, longitude, dayOfYear)  ; sunrise and sunset UTC time from midnight in minutes
                 sunriseMin := srSsMin[1]
                 sunsetMin := srSsMin[2]
-    
+
                 ; If no sun all day (polar night) or only sun all day (midnight sun)
                 if sunriseMin = 0 && sunsetMin = 0 || sunriseMin = 1 && sunsetMin = 1
                     return [sunriseMin, sunsetMin]
-    
+
                 ; If sunrise was day before this, calculate sunrise from next day and use it if next day is sunrise (if not, just move the original calculated sunrise by 24 hours)
                 if sunriseMin < 0
                 {
@@ -509,7 +532,7 @@ CheckState()
                         sunsetMin := srSsMin[2]
                     }
                 }
-    
+
                 ; Calculate hours, minutes and seconds from minutes
                 srHour := Floor(sunriseMin / 60)
                 srMin := Floor(sunriseMin - srHour * 60)
@@ -517,21 +540,21 @@ CheckState()
                 ssHour := Floor(sunsetMin / 60)
                 ssMin := Floor(sunsetMin - ssHour * 60)
                 ssSec := Round((sunsetMin - ssHour * 60 - ssMin) * 60)
-    
+
                 ; Join today date with sunrise/sunset times to get YYYYMMDDHH24MISS format
                 sunrise := FormatTime(A_NowUTC, "yyyyMMdd") Format("{:02}{:02}{:02}", srHour, srMin, srSec)
                 sunset := FormatTime(A_NowUTC, "yyyyMMdd") Format("{:02}{:02}{:02}", ssHour, ssMin, ssSec)
                 return [sunrise, sunset]
-    
+
                 ; Calculate current timezone shift (difference between current date time and UTC date time)
                 GetTimezoneShift() => DateDiff(A_Now, A_NowUTC, "Hours")
-    
+
                 ; Calculate sunrise and sunset UTC time from midnight in minutes from latitude, longitude and day of year and return that values as Array
                 CalculateSrSsMin(latitude, longitude, dayOfYear)
                 {
                     ; Calculate fractional year gamma (in radians)
                     gamma := 2 * Pi / 365 * (dayOfYear - 1 + ((12 - 12) / 24))  ; Assuming noon for simplicity
-    
+
                     ; Equation of time (in minutes)
                     eqtime := 229.18 * (
                         0.000075
@@ -540,7 +563,7 @@ CheckState()
                         - 0.014615 * Cos(2 * gamma)
                         - 0.040849 * Sin(2 * gamma)
                     )
-    
+
                     ; Solar declination (in radians)
                     decl := (
                         0.006918
@@ -551,30 +574,30 @@ CheckState()
                         - 0.002697 * Cos(3 * gamma)
                         + 0.00148 * Sin(3 * gamma)
                     )
-    
+
                     latRad := Rad(latitude)
                     zenith := Rad(90.833)  ; Standard refraction + solar radius correction
                     cosH := (Cos(zenith) - Sin(latRad) * Sin(decl)) / (Cos(latRad) * Cos(decl))  ; Cosine of the hour angle
-    
+
                     ; Can't calculate sunrise/sunset if cosH isn't between -1 and 1 (midnight sun or polar night)
                     if cosH > 1
                         return [0, 0]
-    
+
                     if cosH < -1
                         return [1, 1]
-    
+
                     ; Hour angle for sunrise/sunset (in radians)
                     ha := Acos(cosH)
-    
+
                     ; Solar noon (in minutes)
                     solarNoon := 720 - 4 * longitude - eqtime
-    
+
                     ; Calculate sunrise/sunset times in minutes from midnight UTC
                     sunriseMin := solarNoon - (Deg(ha) * 4)
                     sunsetMin := solarNoon + (Deg(ha) * 4)
-    
+
                     return [sunriseMin, sunsetMin]
-    
+
                     ; Convert radians from degrees and vice versa
                     Rad(deg) => deg * (Pi / 180)
                     Deg(rad) => rad * (180 / Pi)
