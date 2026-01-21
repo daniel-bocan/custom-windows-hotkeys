@@ -24,7 +24,7 @@
 ; Actions independent of mode:
     ; Run Everything program on logon
     ; Change app theme based on sunrise and sunset time or on times set in settings
-    ; Change keyboard layout based on active window - primary for VS Code, secondary for Discord and default for other apps
+    ; Change keyboard layout based on active window
 
 ; Note:
 ; Many settings can be changed in the settings.ini file, including disabling any action or hotkey and setting custom hotkey key combiantions
@@ -36,8 +36,6 @@ powerSaverGUID := IniRead("local_config.ini", "GUID", "powerSaverGUID", "")  ; G
 
 ; General settings
 monitorToSwitchWindowsOn := IniRead("settings.ini", "General", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
-primaryKeyboardLayout := IniRead("settings.ini", "General", "primaryKeyboardLayout", 0)
-secondaryKeyboardLayout := IniRead("settings.ini", "General", "secondaryKeyboardLayout", 0)
 portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "")
 homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
 
@@ -52,6 +50,12 @@ travelLongitude := IniRead("settings.ini", "AppTheme", "travelLongitude", 0)
 travelTimezoneShift := IniRead("settings.ini", "AppTheme", "travelTimezoneShift", 0)
 lightThemeHour := IniRead("settings.ini", "AppTheme", "defaultLightThemeHour", 7)
 darkThemeHour := IniRead("settings.ini", "AppTheme", "defaultDarkThemeHour", 20)
+
+; Keyboard layout
+primaryKeyboardLayoutID := IniRead("settings.ini", "KeyboardLayout", "primaryID", 0)
+secondaryKeyboardLayoutID := IniRead("settings.ini", "KeyboardLayout", "secondaryID", 0)
+primaryKeyboardLayoutApps := StrSplit(StrReplace(IniRead("settings.ini", "KeyboardLayout", "primaryApps", ""), ", ", ","), ",")
+secondaryKeyboardLayoutApps := StrSplit(StrReplace(IniRead("settings.ini", "KeyboardLayout", "secondaryApps", ""), ", ", ","), ",")
 
 ; Action toggler
 runEverythingOnLogon := IniRead("settings.ini", "ActionToggler", "runEverythingOnLogon", 1)
@@ -89,7 +93,6 @@ spotifyExe := "Spotify.exe"
 steamExe := "Steam.exe"
 epicgamesExe := "EpicGamesLauncher.exe"
 wargamingExe := "wgc.exe"
-vscodeExe := "Code.exe"
 everythingPath := A_ProgramFiles "\Everything\" everythingExe
 ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
 discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discordExe
@@ -628,13 +631,13 @@ CheckState()
 
 /**
  * @description  
- * Check keyboard layout if it is correct based on active window. For Discord use secondary keyboard layout, for VS Code use primary keyboard layout and for other apps use default keyboard layout.
+ * Check keyboard layout if it is correct based on active window. For special apps (apps that are included in primary or secondary keyboard layout app list) use layout that should be used based on in which list app is and for other apps use default keyboard layout.
  */
 CheckKeyboardLayout()
 {
-    static lastID := 0  ; ID of window that was active before Discord or VS Code
-    static lastExe := ""  ; Process name of window that was active before Discord or VS Code
-    static wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout  ; If primary is default keyboard layout (default is that one which was active before Discord or VS Code)
+    static lastID := 0  ; ID of window that was active before any special app
+    static lastExe := ""  ; Process name of window that was active before any special app
+    static wasPrimary := GetKeyboardLayout() = primaryKeyboardLayoutID  ; If primary is default keyboard layout (default is that one which was active before any special app)
 
     ; Get the active window ID
     activeID := WinExist("A")
@@ -651,32 +654,35 @@ CheckKeyboardLayout()
 
         Sleep 100  ; Needed to work properly, 100 is minimum
 
-        ; If Discord is active activate secondary keyboard layout
-        if activeExe = discordExe
+        lastExeInPrimaryApps := ContainsElement(primaryKeyboardLayoutApps, lastExe)
+        lastExeInSecondaryApps := ContainsElement(secondaryKeyboardLayoutApps, lastExe)
+
+        ; If secondary app is active, activate secondary keyboard layout
+        if ContainsElement(secondaryKeyboardLayoutApps, activeExe)
         {
-            ; If VS Code wasn't active set default layout otherwise it will be used that one which was active before VS Code
-            if lastExe != vscodeExe
-                wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout
-            SetKeyboardLayout(secondaryKeyboardLayout)
+            ; If no special app was active, set new default layout otherwise it will be used that one which was active before any special apps
+            if !lastExeInPrimaryApps && !lastExeInSecondaryApps
+                wasPrimary := GetKeyboardLayout() = primaryKeyboardLayoutID
+            SetKeyboardLayout(secondaryKeyboardLayoutID)
         }
-        ; If VS Code is active activate primary keyboard layout
-        else if activeExe = vscodeExe
+        ; If primary app is active, activate primary keyboard layout
+        else if ContainsElement(primaryKeyboardLayoutApps, activeExe)
         {
-            ; If Discord wasn't active set default layout otherwise it will be used that one which was active before Discord
-            if lastExe != discordExe
-                wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout
-            SetKeyboardLayout(primaryKeyboardLayout)
+            ; If no special app was active, set new default layout otherwise it will be used that one which was active before any special apps
+            if !lastExeInPrimaryApps && !lastExeInSecondaryApps
+                wasPrimary := GetKeyboardLayout() = primaryKeyboardLayoutID
+            SetKeyboardLayout(primaryKeyboardLayoutID)
         }
-        ; Switch back to the default keyboard layout after Discord or VS Code was active
+        ; Switch back to the default keyboard layout after some special app was active
         else
         {
-            if lastExe = discordExe && wasPrimary
-                SetKeyboardLayout(primaryKeyboardLayout)
-            else if lastExe = vscodeExe && !wasPrimary
-                SetKeyboardLayout(secondaryKeyboardLayout)
+            if lastExeInSecondaryApps && wasPrimary
+                SetKeyboardLayout(primaryKeyboardLayoutID)
+            else if lastExeInPrimaryApps && !wasPrimary
+                SetKeyboardLayout(secondaryKeyboardLayoutID)
         }
 
-        ; Set new lastProcessName only if process name isn't explorer (task bar)
+        ; Set new last exe only if active exe isn't explorer (task bar)
         if activeExe != "explorer.exe"
             lastExe := activeExe
     }
@@ -1306,9 +1312,9 @@ AreChosenLayoutsInstalled()
         langID := hkl & 0xFFFF
 
         ; Check if both primary and secondary keyboard layouts are installed
-        if primaryKeyboardLayout = langID
+        if primaryKeyboardLayoutID = langID
             primaryExist := true
-        if secondaryKeyboardLayout = langID
+        if secondaryKeyboardLayoutID = langID
             secondaryExist := true
     }
     return primaryExist && secondaryExist

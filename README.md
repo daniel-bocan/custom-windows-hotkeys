@@ -37,7 +37,7 @@ The actions depends on whether portable mode is enabled (if there is only 1 moni
 
 -   Run Everything program on logon.
 -   Change app theme based on sunrise and sunset time or on times set in settings.
--   Change keyboard layout based on active window (primary for VS Code, secondary for Discord and default for other apps).
+-   Change keyboard layout based on active window.
 
 ## Getting Started
 
@@ -118,6 +118,14 @@ If change app theme should be based on **fixed times**, set settings below:
 
 -   To change the **app light theme** activation hour, modify `lightThemeHour` variable.
 -   To change the **app dark theme** activation hour, modify `darkThemeHour` variable.
+
+#### Keyboard layout
+
+Keyboard layouts with different languages can be changed based on active window. It is possible to set primary and secondary layout where each can be used for selected apps and for other apps will be used default layout (the layout set in Windows settings as active).
+
+-   To set **primary and secondary keyboard layout**, modify `primaryID` and `secondaryID` variables. These IDs are hexadecimal values in 0xFFFF format. These IDs doesn't describe specific layouts but only **language of layout** (4 last digits of specific layout ID). For example United States-International has ID 00020409 so language ID is 0x0409.
+
+-   To set **apps to use primary or secondary keyboard layout**, modify `primaryApps` and `secondaryApps` variables. Each variable store list of `.exe` file names separated by comma or comma with one space after comma.
 
 #### Action and Hotkey toggle
 
