@@ -82,29 +82,20 @@ compareTextsHotkey := IniRead("settings.ini", "Hotkeys", "compareTexts", "#^X")
 ; Game list
 gameList := StrSplit(IniRead("settings.ini", "GameList", , ""), '`n')
 
-; Find dir which starts with start variable
-GetDirStartsWith(start)
-{
-    loop files start, 'D'
-    {
-        return A_LoopFileFullPath "\"
-    }
-}
-
-; Paths, .exe names, window IDs
-everything_exe := "Everything.exe"
-discord_exe := "Discord.exe"
-spotify_exe := "Spotify.exe"
-steam_exe := "Steam.exe"
-epicgames_exe := "EpicGamesLauncher.exe"
-wargaming_exe := "wgc.exe"
-vscode_exe := "Code.exe"
-everythingPath := A_ProgramFiles "\Everything\" everything_exe
+; Paths, .exe names
+everythingExe := "Everything.exe"
+discordExe := "Discord.exe"
+spotifyExe := "Spotify.exe"
+steamExe := "Steam.exe"
+epicgamesExe := "EpicGamesLauncher.exe"
+wargamingExe := "wgc.exe"
+vscodeExe := "Code.exe"
+everythingPath := A_ProgramFiles "\Everything\" everythingExe
 ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
-discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discord_exe
-spotifyPath := A_AppData "\Spotify\" spotify_exe
-steamPath := "C:\Program Files (x86)\Steam\" steam_exe
-epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
+discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discordExe
+spotifyPath := A_AppData "\Spotify\" spotifyExe
+steamPath := "C:\Program Files (x86)\Steam\" steamExe
+epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\" epicgamesExe
 VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
 
 ; Constants
@@ -126,7 +117,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling 
 ; Main
 
 ; Run Everything on logon
-if runEverythingOnLogon && !ProcessExist(everything_exe) && FileExist(everythingPath)
+if runEverythingOnLogon && !ProcessExist(everythingExe) && FileExist(everythingPath)
     Run(everythingPath, , "Hide")
 
 ; Check keyboard layout
@@ -203,24 +194,24 @@ CheckState()
             SetTimer(TerminateGameLaunchers, 20000)
         TerminateGameLaunchers()
         {
-            static repeat_index := 0  ; Only in function scope
-            if ProcessExist(wargaming_exe)
+            static repeatIndex := 0  ; Only in function scope
+            if ProcessExist(wargamingExe)
             {
-                ProcessClose(wargaming_exe)
+                ProcessClose(wargamingExe)
                 SetTimer(TerminateGameLaunchers, 0)  ; Disable timer
             }
             ; If it checked 10 times, stop checking it
-            else if repeat_index >= 10
+            else if repeatIndex >= 10
                 SetTimer(TerminateGameLaunchers, 0)  ; Disable timer
             ; Terminate Steam and Epic Games in first iteration if it is running
-            if repeat_index = 0
+            if repeatIndex = 0
             {
-                if ProcessExist(steam_exe)
-                    ProcessClose(steam_exe)
-                if ProcessExist(epicgames_exe)
-                    ProcessClose(epicgames_exe)
+                if ProcessExist(steamExe)
+                    ProcessClose(steamExe)
+                if ProcessExist(epicgamesExe)
+                    ProcessClose(epicgamesExe)
             }
-            repeat_index++
+            repeatIndex++
         }
         ; Enable Power saver Power scheme and enable Energy saver
         ; Internally, the way it works is that the Power saver Power scheme is set to turn on Energy saver at 100%, so it is always on (it is necessary to set it up before using the script)
@@ -270,19 +261,19 @@ CheckState()
             Sleep(10000)
 
         ; Get coordinates of the monitor
-        MonitorGet monitor, &Left, &Top
+        MonitorGet monitor, &left, &top
 
-        if !WinExist("ahk_exe " discord_exe) && FileExist(discordPath) && discordStart
+        if !WinExist("ahk_exe " discordExe) && FileExist(discordPath) && discordStart
         {
-            wasDiscordRunning := ProcessExist(discord_exe)
+            wasDiscordRunning := ProcessExist(discordExe)
 
             ; Get the "normal" active window ID, if any, used only if discord is running in background
-            first_active_id := WinIsNormal(WinExist("A"))
+            firstActiveID := WinIsNormal(WinExist("A"))
 
             Run(discordPath)
             ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use this instead of Run(discordPath) to run Discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it will kill Discord
 
-            ; With Discord is problem that when it starts after log on, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discord_id is now the main window. If Discord was running (on system wake up) no Updater window will show, so it will not wait for Discord Updater window but directly for the Discord window
+            ; With Discord is problem that when it starts after log on, the Updater appears first and then the main window. To work with the main window, the script waits for the Updater to appear, to close, and then only the main window remains, so it is certain that discordID is now the main window. If Discord was running (on system wake up) no Updater window will show, so it will not wait for Discord Updater window but directly for the Discord window
             if !wasDiscordRunning
             {
                 ; Wait for Discord Updater window to open and then wait to close
@@ -291,57 +282,57 @@ CheckState()
             }
 
             ; Wait for Discord window but with different title then Discord Updater
-            discord_id := WinWait("ahk_exe " discord_exe, , 60, "Discord Updater")
-            if discord_id
+            discordID := WinWait("ahk_exe " discordExe, , 60, "Discord Updater")
+            if discordID
             {
-                if !IsOnMonitor(discord_id, monitor, true)
+                if !IsOnMonitor(discordID, monitor, true)
                 {
                     ; Unmaximize window, move it to the selected monitor and then maximize it
-                    WinRestore(discord_id)
-                    WinMove(Left, Top, , , discord_id)
-                    WinMaximize(discord_id)
+                    WinRestore(discordID)
+                    WinMove(left, top, , , discordID)
+                    WinMaximize(discordID)
                 }
             }
 
             ; Get the "normal" active window ID, if any
-            active_id := WinIsNormal(WinExist("A"))
+            activeID := WinIsNormal(WinExist("A"))
 
             if !wasDiscordRunning
             {
-                WinActivateCorrectly(active_id, WinGetID(discord_id), true, false, true)
+                WinActivateCorrectly(activeID, WinGetID(discordID), true, false, true)
                 Sleep(2000)  ; Wait a while to load the Discord
-                WinActivateCorrectly(WinGetID(discord_id), active_id, false, true, false)
+                WinActivateCorrectly(WinGetID(discordID), activeID, false, true, false)
                 someWinActivated := true
             }
             else
             {
                 Sleep(1000)  ; Wait a while to load the Discord
-                WinActivateCorrectly(WinGetID(discord_id), first_active_id, false, true, false)
+                WinActivateCorrectly(WinGetID(discordID), firstActiveID, false, true, false)
                 someWinActivated := true
             }
         }
 
-        if !WinExist("ahk_exe " spotify_exe) && FileExist(spotifyPath) && spotifyStart
+        if !WinExist("ahk_exe " spotifyExe) && FileExist(spotifyPath) && spotifyStart
         {
             Run(spotifyPath)
             ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use this instead of Run(spotifyPath) to run Spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill Spotify
 
             ; Wait until Spotify is running and if it is not on the selected monitor, move it there
-            spotify_id := WinWait("ahk_exe " spotify_exe, , 120)
-            if spotify_id && !IsOnMonitor(spotify_id, monitor, true)
+            spotifyID := WinWait("ahk_exe " spotifyExe, , 120)
+            if spotifyID && !IsOnMonitor(spotifyID, monitor, true)
             {
                 ; Unmaximize window, move it to the selected monitor and then maximize it
-                WinRestore(spotify_id)
-                WinMove(Left, Top, , , spotify_id)
-                WinMaximize(spotify_id)
+                WinRestore(spotifyID)
+                WinMove(left, top, , , spotifyID)
+                WinMaximize(spotifyID)
             }
 
             ; Get the "normal" active window ID, if any
-            active_id := WinIsNormal(WinExist("A"))
+            activeID := WinIsNormal(WinExist("A"))
 
-            WinActivateCorrectly(active_id, spotify_id, true, false, false)
+            WinActivateCorrectly(activeID, spotifyID, true, false, false)
             Sleep(1000)  ; Wait a while to load the Spotify
-            WinActivateCorrectly(spotify_id, active_id, false, true, false)
+            WinActivateCorrectly(spotifyID, activeID, false, true, false)
             someWinActivated := true
         }
 
@@ -350,15 +341,15 @@ CheckState()
             DisableThreadMerge()
 
         ; Run Steam and Epic Games in background if it was not running. WGC run automatically on startup.
-        if !ProcessExist(steam_exe) && FileExist(steamPath) && gameLaunchersOperations
+        if !ProcessExist(steamExe) && FileExist(steamPath) && gameLaunchersOperations
         {
             Run(steamPath " -Silent")
             ; Steam sometimes open update window, if yes minimize it
-            steam_id := WinWait("ahk_exe " steam_exe)
-            if WinExist(steam_id)
-                WinMinimize(steam_id)
+            steamID := WinWait("ahk_exe " steamExe)
+            if WinExist(steamID)
+                WinMinimize(steamID)
         }
-        if !ProcessExist(epicgames_exe) && FileExist(epicgamesPath) && gameLaunchersOperations
+        if !ProcessExist(epicgamesExe) && FileExist(epicgamesPath) && gameLaunchersOperations
             Run(epicgamesPath " -Silent")
     }
 
@@ -641,53 +632,53 @@ CheckState()
  */
 CheckKeyboardLayout()
 {
-    static last_id := 0  ; ID of window that was active before Discord or VS Code
-    static lastProcessName := ""  ; Process name of window that was active before Discord or VS Code
+    static lastID := 0  ; ID of window that was active before Discord or VS Code
+    static lastExe := ""  ; Process name of window that was active before Discord or VS Code
     static wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout  ; If primary is default keyboard layout (default is that one which was active before Discord or VS Code)
 
     ; Get the active window ID
-    active_id := WinExist("A")
+    activeID := WinExist("A")
 
     ; Check layout only if active window changed
-    if (active_id != last_id)
+    if (activeID != lastID)
     {
-        last_id := active_id
+        lastID := activeID
 
         try
-            processName := WinGetProcessName(active_id)
+            activeExe := WinGetProcessName(activeID)
         catch
             return
 
         Sleep 100  ; Needed to work properly, 100 is minimum
 
         ; If Discord is active activate secondary keyboard layout
-        if processName = discord_exe
+        if activeExe = discordExe
         {
             ; If VS Code wasn't active set default layout otherwise it will be used that one which was active before VS Code
-            if lastProcessName != vscode_exe
+            if lastExe != vscodeExe
                 wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout
             SetKeyboardLayout(secondaryKeyboardLayout)
         }
         ; If VS Code is active activate primary keyboard layout
-        else if processName = vscode_exe
+        else if activeExe = vscodeExe
         {
             ; If Discord wasn't active set default layout otherwise it will be used that one which was active before Discord
-            if lastProcessName != discord_exe
+            if lastExe != discordExe
                 wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout
             SetKeyboardLayout(primaryKeyboardLayout)
         }
         ; Switch back to the default keyboard layout after Discord or VS Code was active
         else
         {
-            if lastProcessName = discord_exe && wasPrimary
+            if lastExe = discordExe && wasPrimary
                 SetKeyboardLayout(primaryKeyboardLayout)
-            else if lastProcessName = vscode_exe && !wasPrimary
+            else if lastExe = vscodeExe && !wasPrimary
                 SetKeyboardLayout(secondaryKeyboardLayout)
         }
 
         ; Set new lastProcessName only if process name isn't explorer (task bar)
-        if processName != "explorer.exe"
-            lastProcessName := processName
+        if activeExe != "explorer.exe"
+            lastExe := activeExe
     }
 }
 
@@ -710,9 +701,9 @@ MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monit
     ids := WinGetNormalList()  ; Get all "normal window" IDs
 
     ; Iterate all IDs and choose IDs of windows that are on the primary monitor and add it to group and minimized list
-    for this_id in ids
+    for thisID in ids
     {
-        if IsOnPrimaryMonitor(this_id, true)  ; Check if on the primary monitor
+        if IsOnPrimaryMonitor(thisID, true)  ; Check if on the primary monitor
         {
             ; reset list of minimized windows (it can be at the start of this hotkey but if this hotkey would be activated twice in a row by mistake, the hotkey for restoration will not work)
             if !topmostWinFound
@@ -720,8 +711,8 @@ MinimizeWindows(*)  ; Press Win + F to minimize all windows on the primary monit
                 minimizedWindows := []
                 topmostWinFound := true
             }
-            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window to group (at the first iteration it'll always create new group)
-            minimizedWindows.Push(this_id)  ; Add to minimized list
+            GroupAdd("MinimizeGroup" groupCounter, "ahk_id " thisID)  ; Add window to group (at the first iteration it'll always create new group)
+            minimizedWindows.Push(thisID)  ; Add to minimized list
         }
     }
 
@@ -738,14 +729,14 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
     groupCounter++  ; comment for slow restore
 
     ids := WinGetNormalList()  ; Get all "normal window" IDs
-    active_id := 0
+    activeID := 0
 
     ; Iterate all IDs to find ID of the topmost window of the primary monitor that is not minimized (if user open window between minimization and restoration it will be active after restoration)
-    for this_id in ids
+    for thisID in ids
     {
-        if IsOnPrimaryMonitor(this_id, true) && WinGetMinMax(this_id) != -1  ; Check if on the primary monitor and if it's not minimized
+        if IsOnPrimaryMonitor(thisID, true) && WinGetMinMax(thisID) != -1  ; Check if on the primary monitor and if it's not minimized
         {
-            active_id := this_id
+            activeID := thisID
             break
         }
     }
@@ -755,39 +746,39 @@ RestoreWindows(*)  ; Press Win + H to restore all minimized windows on the prima
         ; Iterate minimizedWindows list from behind and restore windows that exist and that are not maximized one by one (maximized windows should not be restored because they will be unmaximized)
         loop minimizedWindows.Length
         {
-            this_id := minimizedWindows[-A_Index]
-            if WinExist(this_id) && WinGetMinMax(this_id) != 1
+            thisID := minimizedWindows[-A_Index]
+            if WinExist(thisID) && WinGetMinMax(thisID) != 1
             {
-                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " this_id)  ; Add window ID in group; comment for slow restore
-                ; WinRestore(this_id)  ; uncomment for slow restore
+                GroupAdd("MinimizeGroup" groupCounter, "ahk_id " thisID)  ; Add window ID in group; comment for slow restore
+                ; WinRestore(thisID)  ; uncomment for slow restore
             }
         }
 
         WinRestore("ahk_group MinimizeGroup" groupCounter)  ; comment for slow restore
 
         ; Activate window that was active on the primary monitor before window restoration or if there was none then activate window that was topmost before restoration
-        if !active_id
-            active_id := minimizedWindows[1]
-        if WinExist(active_id)
-            WinActivate(active_id)
+        if !activeID
+            activeID := minimizedWindows[1]
+        if WinExist(activeID)
+            WinActivate(activeID)
         minimizedWindows := []
     }
 }
 
 MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone and pause/play Spotify if it is playing
 {
-    discord_id := WinExist("ahk_exe " discord_exe)
-    if discord_id
+    discordID := WinExist("ahk_exe " discordExe)
+    if discordID
     {
         ids := WinGetNormalList()  ; Get all "normal window" IDs
 
         try
-            active_exe := WinGetProcessName("A")  ; Get .exe file name of the active window
+            activeExe := WinGetProcessName("A")  ; Get .exe file name of the active window
         catch
-            active_exe := WinGetProcessName(ids[1])  ; Get .exe file name of the topmost window (sometimes "A" is not found)
+            activeExe := WinGetProcessName(ids[1])  ; Get .exe file name of the topmost window (sometimes "A" is not found)
 
         ; For games
-        if ContainsElement(gameList, active_exe)  ; Check if game is active window (compare active window .exe name with .exe names from list)
+        if ContainsElement(gameList, activeExe)  ; Check if game is active window (compare active window .exe name with .exe names from list)
         {
             Send "+{SC029}"
             Sleep 500
@@ -801,12 +792,12 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
         {
             ; Get the "normal" active window ID, if any
             ; It is almost always some window active but sometimes it can't find it, so then it will set the topmost window as active, if it is
-            first_active_id := WinIsNormal(WinExist("A"))
-            if !first_active_id
+            firstActiveID := WinIsNormal(WinExist("A"))
+            if !firstActiveID
             {
-                first_active_id := ids[1]
-                if !WinActive(first_active_id)
-                    first_active_id := 0
+                firstActiveID := ids[1]
+                if !WinActive(firstActiveID)
+                    firstActiveID := 0
             }
 
             minimizedWindows := []
@@ -814,57 +805,57 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
 
             ; Find out on what monitor Discord is
             loop MonitorGetCount()
-                if IsOnMonitor(discord_id, A_Index, true)
+                if IsOnMonitor(discordID, A_Index, true)
                     monitor := A_Index
 
             ; Iterate for IDs of windows that are on the same monitor as Discord
             allMaximized := 1
-            for this_id in ids
+            for thisID in ids
             {
-                if IsOnMonitor(this_id, monitor, true)
+                if IsOnMonitor(thisID, monitor, true)
                 {
-                    minimizedWindows.Push(this_id)  ; Add window IDs to minimized list
+                    minimizedWindows.Push(thisID)  ; Add window IDs to minimized list
                     if allMaximized
-                        allMaximized := WinGetMinMax(this_id)
+                        allMaximized := WinGetMinMax(thisID)
                 }
             }
 
             ; Activate Discord window and send Ctrl + Shift + M hotkey to mute/unmute microphone
-            if first_active_id != discord_id
+            if firstActiveID != discordID
             {
-                WinActivateCorrectly(first_active_id, discord_id, true, false, false)
+                WinActivateCorrectly(firstActiveID, discordID, true, false, false)
             }
             Send "^+m"
             Sleep 500  ; Determine for how long will Discord show (minimum is 1 for proper functioning)
 
             ; Sorting windows out
-            if discord_id != first_active_id  ; If Discord window is active it will remain active
+            if discordID != firstActiveID  ; If Discord window is active it will remain active
             {
-                if discord_id != minimizedWindows[1]  ; If Discord window was the topmost window but not active (active window was on the other monitor) it will activate window which was active at the beginning
+                if discordID != minimizedWindows[1]  ; If Discord window was the topmost window but not active (active window was on the other monitor) it will activate window which was active at the beginning
                 {
                     if !allMaximized  ; If there is some window that is not maximized it will move windows one by one from the topmost to the bottommost to the bottom to achieve the same window order as at the beginning
                     {
-                        for this_id in minimizedWindows
+                        for thisID in minimizedWindows
                         {
-                            WinMoveBottom(this_id)
+                            WinMoveBottom(thisID)
                         }
                     }
-                    WinActivateCorrectly(discord_id, minimizedWindows[1], true, false, false)  ; Activate the window that was the topmost window on monitor where is Discord
+                    WinActivateCorrectly(discordID, minimizedWindows[1], true, false, false)  ; Activate the window that was the topmost window on monitor where is Discord
                 }
 
                 ; Get the "normal" active window ID, if any
-                last_active_id := WinIsNormal(WinExist("A"))
-                WinActivateCorrectly(last_active_id, first_active_id, false, true, false)  ; Activate the window that was active at the beginning
+                lastActiveID := WinIsNormal(WinExist("A"))
+                WinActivateCorrectly(lastActiveID, firstActiveID, false, true, false)  ; Activate the window that was active at the beginning
             }
         }
     }
 
     ; Pause/play music on Spotify but if music wasn't stopped using this hotkey it will not play it, so it can't play music if I didn't pause it using this hotkey
     global played
-    spotify_id := WinExist("ahk_exe " spotify_exe)  ; Check if Spotify is running
-    if spotify_id
+    spotifyID := WinExist("ahk_exe " spotifyExe)  ; Check if Spotify is running
+    if spotifyID
     {
-        spotifyTitle := WinGetTitle(spotify_id)
+        spotifyTitle := WinGetTitle(spotifyID)
         if spotifyTitle != "Spotify Free" && spotifyTitle != "Spotify Premium"  ; Check if music is playing
         {
             Send "{Media_Play_Pause}"
@@ -896,24 +887,24 @@ SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or s
     }
 
     ids := WinGetNormalList()  ; Get all "normal window" IDs
-    this_id := 0
+    thisID := 0
 
     ; Get the "normal" active window ID, if any
-    active_id := WinIsNormal(WinExist("A"))
+    activeID := WinIsNormal(WinExist("A"))
 
     ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
     loop ids.Length
     {
-        this_id := ids.Pop()
-        if IsOnMonitor(this_id, monitor, true)  ; Check if on the secondary (chosen) monitor
+        thisID := ids.Pop()
+        if IsOnMonitor(thisID, monitor, true)  ; Check if on the secondary (chosen) monitor
         {
-            WinActivateCorrectly(active_id, this_id, true, false, false)
+            WinActivateCorrectly(activeID, thisID, true, false, false)
             break
         }
     }
     ; Activate the window from the beginning if it is not on the secondary monitor
-    if active_id && !IsOnMonitor(active_id, monitor, true)
-        WinActivateCorrectly(this_id, active_id, false, true, false)
+    if activeID && !IsOnMonitor(activeID, monitor, true)
+        WinActivateCorrectly(thisID, activeID, false, true, false)
 }
 
 AppendClipboard(*) ; Press Win + Ctrl + C to append selected text to the end of clipboard with blank line between texts
@@ -1093,27 +1084,40 @@ CompareTexts(*) ; Press Win + Ctrl + X to compare selected text with clipboard; 
 ; Utility functions
 
 /**
+ * @description  
+ * Get full path that starts with string from parameter.
+ * @param {(String)} start Start of the path.
+ */
+GetDirStartsWith(start)
+{
+    loop files start, 'D'
+    {
+        return A_LoopFileFullPath "\"
+    }
+}
+
+/**
  * @description Checks if the window has border but I use it to check if the window is "normal window".  
  * "Normal window" is a window that is in foreground (minimized, maximized, restored, etc.) and not a special window on background like Program Manager, etc.
- * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} WinTitle  
+ * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} winTitle  
  * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
  * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
  * Window title is optional and must come before any `ahk_` criteria.  
  * If WinTitle is the letter `A`, the active window is used.  
  * @returns {(Integer)}  
  * The ID of the specified window.
- * If the window is not "normal" or id is 0 or does not exist, 0 is returned.
+ * If the window is not "normal" or ID is 0 or does not exist, 0 is returned.
  */
-WinIsNormal(WinTitle)
+WinIsNormal(winTitle)
 {
-    if !WinTitle
+    if !winTitle
         return 0
     try
-        style := WinGetStyle(WinTitle)
+        style := WinGetStyle(winTitle)
     catch
         return 0
     if style & 0x800000
-        return WinTitle
+        return winTitle
     return 0
 }
 
@@ -1129,24 +1133,24 @@ WinGetNormalList()
 {
     ids := WinGetList()
     normalWindows := []
-    for this_id in ids
+    for thisID in ids
     {
-        if WinIsNormal(this_id)
-            normalWindows.Push(this_id)
+        if WinIsNormal(thisID)
+            normalWindows.Push(thisID)
     }
     return normalWindows
 }
 
 /**
  * @description Searches inside an array for an instance of the provided element.
- * @param {(Array)} List The list to search inside of.
- * @param {(Any)} Target The element to search for.
+ * @param {(Array)} list The list to search inside of.
+ * @param {(Any)} target The element to search for.
  * @returns {(Integer)}  
  * 1 if found, 0 if not
  */
-ContainsElement(List, Target)
+ContainsElement(list, target)
 {
-    for element in List
+    for element in list
         if element = target
             return true
     return false
@@ -1154,107 +1158,106 @@ ContainsElement(List, Target)
 
 /**
  * @description Finds if window is on specified monitor.
- * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} WinTitle  
+ * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} winTitle  
  * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
  * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
  * Window title is optional and must come before any `ahk_` criteria.  
  * If WinTitle is the letter `A`, the active window is used.  
- * @param {(Integer)} MonitorNumber The monitor number to check if it contains a window.
- * @param {(Integer)} OffsetSwitch If the global offset should be used when finding the window.
+ * @param {(Integer)} monitorNumber The monitor number to check if it contains a window.
+ * @param {(Integer)} offsetSwitch If the global offset should be used when finding the window.
  * @returns {(Integer)}  
  * 1 if found, 0 if not
  */
-IsOnMonitor(WinTitle, MonitorNumber, OffsetSwitch)
+IsOnMonitor(winTitle, monitorNumber, offsetSwitch)
 {
     global monitorOffset
     offset := monitorOffset
-    if !OffsetSwitch
+    if !offsetSwitch
         offset := 0
-    MonitorGet MonitorNumber, &Left, &Top, &Right, &Bottom  ; Get coordinates of the primary monitor
-    WinGetClientPos &OutX, &OutY, &OutWidth, &OutHeight, WinTitle  ; Get coordinates of window of this iteration (client pos is more accurate then window pos)
-    return OutX < Right - offset && OutX + OutWidth > Left + offset && OutY < Bottom - offset && OutY + OutHeight > Top +
-        offset  ; Check if on the primary monitor
+    MonitorGet monitorNumber, &left, &top, &right, &bottom  ; Get coordinates of the primary monitor
+    WinGetClientPos &outX, &outY, &outWidth, &outHeight, winTitle  ; Get coordinates of window of this iteration (client pos is more accurate then window pos)
+    return outX < right - offset && outX + outWidth > left + offset && outY < bottom - offset && outY + outHeight > top + offset  ; Check if on the primary monitor
 }
 
 /**
  * @description Finds if window is on the primary monitor. Uses the IsOnMonitor function.
- * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} WinTitle  
+ * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} winTitle  
  * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
  * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
  * Window title is optional and must come before any `ahk_` criteria.  
  * If WinTitle is the letter `A`, the active window is used.  
- * @param {(Integer)} OffsetSwitch If the global offset should be used when finding the window.
+ * @param {(Integer)} offsetSwitch If the global offset should be used when finding the window.
  * @returns {(Integer)}  
  * 1 if found, 0 if not
  */
-IsOnPrimaryMonitor(WinTitle, OffsetSwitch)
+IsOnPrimaryMonitor(winTitle, offsetSwitch)
 {
-    return IsOnMonitor(WinTitle, MonitorGetPrimary(), OffsetSwitch)
+    return IsOnMonitor(winTitle, MonitorGetPrimary(), offsetSwitch)
 }
 
 /**
  * @description  
  * Activate window properly (not flashing taskbar icon).  
  * It attach the active window thread with the target window thread. After that, window can be activated without problems because it acts like it is on the same thread as the window that was active before. Without it the new window will not activate at all or not correctly and the taskbar icon will flash. This technique is used only the first time any window is activated after the script start, then it works correctly without the Thread merge.
- * @param {(Integer)} Active_id  
+ * @param {(Integer)} activeID  
  * ID of currently active window.  
  * If 0, Thread merging will not be used.
- * @param {(Integer)} Target_id  
+ * @param {(Integer)} targetID  
  * ID of window that will be activated.
  * If 0, nothing will happen.
- * @param {(Integer)} Wait If script should wait to window be active.
- * @param {(Integer)} DisableThreadMerging If the Thread merging should be disabled after this activation.
- * @param {(Integer)} [ActivateActive] If the window should activate even if it looks like it is already active.
+ * @param {(Integer)} wait If script should wait to window be active.
+ * @param {(Integer)} disableThreadMerging If the Thread merging should be disabled after this activation.
+ * @param {(Integer)} [activateActive] If the window should activate even if it looks like it is already active.
  */
-WinActivateCorrectly(Active_id, Target_id, Wait, DisableThreadMerging, ActivateActive := 0)
+WinActivateCorrectly(activeID, targetID, wait, disableThreadMerging, activateActive := 0)
 {
-    ; If target id is 0, do nothing
-    if !Target_id
+    ; If target ID is 0, do nothing
+    if !targetID
         return
 
-    ; If active id is 0, do activate target window normally
-    if !Active_id
+    ; If active ID is 0, do activate target window normally
+    if !activeID
     {
         WinActivateNormally()
 
-        if DisableThreadMerging
+        if disableThreadMerging
             DisableThreadMerge()
         return
     }
 
-    ; Do anyting only if target and active ids are different or if active window can be activated and active window is not Start menu (it blocks activation)
-    if (ActivateActive || Active_id != Target_id) && WinGetTitle(Active_id) != "Start"
+    ; Do anyting only if target and active IDs are different or if active window can be activated and active window is not Start menu (it blocks activation)
+    if (activateActive || activeID != targetID) && WinGetTitle(activeID) != "Start"
     {
-        if threadMergeEnabled && Active_id != Target_id
+        if threadMergeEnabled && activeID != targetID
             WinActivateWithThreadMerge()
         else
             WinActivateNormally()
 
-        if DisableThreadMerging
+        if disableThreadMerging
             DisableThreadMerge()
     }
 
     WinActivateNormally()
     {
-        WinActivate(Target_id)
-        if Wait
-            WinWaitActive(Target_id, , 10)
+        WinActivate(targetID)
+        if wait
+            WinWaitActive(targetID, , 10)
     }
 
     WinActivateWithThreadMerge()
     {
         ; Get thread IDs
-        thisThreadId := DllCall("GetWindowThreadProcessId", "ptr", Active_id, "uint*", 0, "uint")
-        targetThreadId := DllCall("GetWindowThreadProcessId", "ptr", Target_id, "uint*", 0, "uint")
+        activeThreadID := DllCall("GetWindowThreadProcessId", "ptr", activeID, "uint*", 0, "uint")
+        targetThreadID := DllCall("GetWindowThreadProcessId", "ptr", targetID, "uint*", 0, "uint")
 
         ; Attach input threads so focus can transfer
-        DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", true)
+        DllCall("AttachThreadInput", "uint", activeThreadID, "uint", targetThreadID, "int", true)
 
         ; Activate the target window
         WinActivateNormally()
 
         ; Detach again
-        DllCall("AttachThreadInput", "uint", thisThreadId, "uint", targetThreadId, "int", false)
+        DllCall("AttachThreadInput", "uint", activeThreadID, "uint", targetThreadID, "int", false)
     }
 }
 
@@ -1339,7 +1342,7 @@ GetKeyboardLayout()
     try
     {
         threadID := DllCall("GetWindowThreadProcessId", "ptr", WinActive("A"), "uint*", 0, "uint")
-        hkl := DllCall("GetKeyboardLayout", "uint", threadID, "ptr")  ; Full keyboard layout ID
+        hkl := DllCall("GetKeyboardLayout", "uint", threadID, "ptr")  ; Full keyboard layout ID (hkl stands for keyboard layout handle)
         return hkl & 0xFFFF  ; 0xFFFF is bitmask and it is used to convert full keyboard layout ID to keyboard language ID
     }
     return 0
