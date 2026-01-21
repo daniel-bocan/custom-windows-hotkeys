@@ -101,12 +101,9 @@ spotifyPath := A_AppData "\Spotify\" spotify_exe
 steamPath := "C:\Program Files (x86)\Steam\" steam_exe
 epicgamesPath := "C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\Win32\" epicgames_exe
 VSCodeSettingsPath := A_AppData "\Code\User\settings.json"
-discord_id := "ahk_exe " discord_exe
-spotify_id := "ahk_exe " spotify_exe
-steam_id := "ahk_exe " steam_exe
 
 ; Constants
-Pi := 3.14159265359
+pi := 3.14159265359
 
 ; Global variables
 logon := true
@@ -258,19 +255,16 @@ CheckState()
         if logon
             Sleep(10000)
 
-        ; Get the "normal" active window ID, if any
-        ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
-        try
-            first_active_id := WinIsNormal(WinGetID("A"))
-        catch
-            first_active_id := 0
-
         ; Get coordinates of the monitor
         MonitorGet monitor, &Left, &Top
 
-        if !WinExist(discord_id) && FileExist(discordPath) && discordStart
+        if !WinExist("ahk_exe " discord_exe) && FileExist(discordPath) && discordStart
         {
             wasDiscordRunning := ProcessExist(discord_exe)
+
+            ; Get the "normal" active window ID, if any, used only if discord is running in background
+            first_active_id := WinIsNormal(WinExist("A"))
+
             Run(discordPath)
             ; Run 'cmd /c start "" ' discordPath ' --processStart Discord.exe'  ; Use this instead of Run(discordPath) to run Discord independently of AutoHotkey (if AHK script is stopped and Run(discordPath)) is used, it will kill Discord
 
@@ -280,59 +274,47 @@ CheckState()
                 ; Wait for Discord Updater window to open and then wait to close
                 if WinWait("Discord Updater", , 10)
                     WinWaitClose("Discord Updater", , 60)
+            }
 
-                ; Wait for Discord window but with different title then Discord Updater
-                if WinWait(discord_id, , 30, "Discord Updater")
+            ; Wait for Discord window but with different title then Discord Updater
+            discord_id := WinWait("ahk_exe " discord_exe, , 60, "Discord Updater")
+            if discord_id
+            {
+                if !IsOnMonitor(discord_id, monitor, true)
                 {
-                    if !IsOnMonitor(discord_id, monitor, true)
-                    {
-                        ; Unmaximize window, move it to the selected monitor and then maximize it
-                        WinRestore(discord_id)
-                        WinMove(Left, Top, , , discord_id)
-                        WinMaximize(discord_id)
-                    }
+                    ; Unmaximize window, move it to the selected monitor and then maximize it
+                    WinRestore(discord_id)
+                    WinMove(Left, Top, , , discord_id)
+                    WinMaximize(discord_id)
                 }
+            }
+
+            ; Get the "normal" active window ID, if any
+            active_id := WinIsNormal(WinExist("A"))
+
+            if !wasDiscordRunning
+            {
+                WinActivateCorrectly(active_id, WinGetID(discord_id), true, false, true)
+                Sleep(2000)  ; Wait a while to load the Discord
+                WinActivateCorrectly(WinGetID(discord_id), active_id, false, true, false)
+                someWinActivated := true
             }
             else
             {
-                ; Wait for any Discord window
-                if WinWait(discord_id, , 30)
-                {
-                    if !IsOnMonitor(discord_id, monitor, true)
-                    {
-                        ; Unmaximize window, move it to the selected monitor and then maximize it
-                        WinRestore(discord_id)
-                        WinMove(Left, Top, , , discord_id)
-                        WinMaximize(discord_id)
-                    }
-                }
+                Sleep(1000)  ; Wait a while to load the Discord
+                WinActivateCorrectly(WinGetID(discord_id), first_active_id, false, true, false)
+                someWinActivated := true
             }
-
-            ; Get the "normal" active window ID, if any
-            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
-            try
-                last_active_id := WinIsNormal(WinGetID("A"))
-            catch
-                last_active_id := 0
-            WinActivateCorrectly(last_active_id, WinGetID(discord_id), true, true, true)
-            Sleep(2000)  ; Wait a while to load the Discord
-            someWinActivated := true
         }
 
-        if !WinExist(spotify_id) && FileExist(spotifyPath) && spotifyStart
+        if !WinExist("ahk_exe " spotify_exe) && FileExist(spotifyPath) && spotifyStart
         {
-            ; Get the "normal" active window ID, if any
-            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
-            try
-                last_active_id := WinIsNormal(WinGetID("A"))
-            catch
-                last_active_id := 0
-
             Run(spotifyPath)
             ; Run 'cmd /c start "" ' spotifyPath ' --processStart Discord.exe'  ; Use this instead of Run(spotifyPath) to run Spotify independently of AutoHotkey (if AHK script is stopped and Run(spotifyPath)) is used, it kill Spotify
 
             ; Wait until Spotify is running and if it is not on the selected monitor, move it there
-            if WinWait(spotify_id) && !IsOnMonitor(spotify_id, monitor, true)
+            spotify_id := WinWait("ahk_exe " spotify_exe, , 120)
+            if spotify_id && !IsOnMonitor(spotify_id, monitor, true)
             {
                 ; Unmaximize window, move it to the selected monitor and then maximize it
                 WinRestore(spotify_id)
@@ -340,21 +322,13 @@ CheckState()
                 WinMaximize(spotify_id)
             }
 
-            WinActivateCorrectly(last_active_id, WinGetID(spotify_id), true, false, false)
-            Sleep(1000)  ; Wait a while to load the Spotify
-            someWinActivated := true
-        }
-
-        ; Activate the window from the beginning
-        if WinExist(first_active_id)
-        {
             ; Get the "normal" active window ID, if any
-            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
-            try
-                last_active_id := WinIsNormal(WinGetID("A"))
-            catch
-                last_active_id := 0
-            WinActivateCorrectly(last_active_id, first_active_id, false, true, false)
+            active_id := WinIsNormal(WinExist("A"))
+
+            WinActivateCorrectly(active_id, spotify_id, true, false, false)
+            Sleep(1000)  ; Wait a while to load the Spotify
+            WinActivateCorrectly(spotify_id, active_id, false, true, false)
+            someWinActivated := true
         }
 
         ; Disable Thread merge if some window was activated (it usually disable automatically but not always, for example if only Spotify was activated)
@@ -366,7 +340,7 @@ CheckState()
         {
             Run(steamPath " -Silent")
             ; Steam sometimes open update window, if yes minimize it
-            WinWait(steam_id)
+            steam_id := WinWait("ahk_exe " steam_exe)
             if WinExist(steam_id)
                 WinMinimize(steam_id)
         }
@@ -553,7 +527,7 @@ CheckState()
                 CalculateSrSsMin(latitude, longitude, dayOfYear)
                 {
                     ; Calculate fractional year gamma (in radians)
-                    gamma := 2 * Pi / 365 * (dayOfYear - 1 + ((12 - 12) / 24))  ; Assuming noon for simplicity
+                    gamma := 2 * pi / 365 * (dayOfYear - 1 + ((12 - 12) / 24))  ; Assuming noon for simplicity
 
                     ; Equation of time (in minutes)
                     eqtime := 229.18 * (
@@ -599,8 +573,8 @@ CheckState()
                     return [sunriseMin, sunsetMin]
 
                     ; Convert radians from degrees and vice versa
-                    Rad(deg) => deg * (Pi / 180)
-                    Deg(rad) => rad * (180 / Pi)
+                    Rad(deg) => deg * (pi / 180)
+                    Deg(rad) => rad * (180 / pi)
                 }
             }
         }
@@ -745,20 +719,20 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
         ; For games
         if ContainsElement(gameList, active_exe)  ; Check if game is active window (compare active window .exe name with .exe names from list)
         {
-            Send "+;"
+            Send "+{SC029}"
             Sleep 500
             Send "^+m"
             Sleep 500
-            Send "+;"
+            Send "+{SC029}"
         }
+
         ; For other apps
         else
         {
             ; Get the "normal" active window ID, if any
-            ; It is almost always some window active but sometimes it can't find it and throw exception, so it will set the topmost window as active, if it is
-            try
-                first_active_id := WinIsNormal(WinGetID("A"))
-            catch
+            ; It is almost always some window active but sometimes it can't find it, so then it will set the topmost window as active, if it is
+            first_active_id := WinIsNormal(WinExist("A"))
+            if !first_active_id
             {
                 first_active_id := ids[1]
                 if !WinActive(first_active_id)
@@ -809,11 +783,7 @@ MuteUnmuteDiscordSpotify(*) ; Press Win + T to mute/unmute Discord microphone an
                 }
 
                 ; Get the "normal" active window ID, if any
-                ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
-                try
-                    last_active_id := WinIsNormal(WinGetID("A"))
-                catch
-                    last_active_id := 0
+                last_active_id := WinIsNormal(WinExist("A"))
                 WinActivateCorrectly(last_active_id, first_active_id, false, true, false)  ; Activate the window that was active at the beginning
             }
         }
@@ -859,11 +829,7 @@ SwitchWindows(*) ; Press Win + B to switch between windows on the secondary or s
     this_id := 0
 
     ; Get the "normal" active window ID, if any
-    ; It is almost always some window active but sometimes it can't find it and throw exception, so it will leave active window unset
-    try
-        active_id := WinIsNormal(WinGetID("A"))
-    catch
-        active_id := 0
+    active_id := WinIsNormal(WinExist("A"))
 
     ; Iterate backwards window IDs to find the bottommost one on the secondary (chosen) monitor and activate it
     loop ids.Length
