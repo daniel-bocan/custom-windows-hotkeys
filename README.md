@@ -37,6 +37,7 @@ The actions depends on whether portable mode is enabled (if there is only 1 moni
 
 -   Run Everything program on logon.
 -   Change app theme based on sunrise and sunset time or on times set in settings.
+-   Change keyboard layout based on active window (primary for VS Code, secondary for Discord and default for other apps).
 
 ## Getting Started
 
@@ -90,6 +91,9 @@ Settings are stored in the `settings.ini` file. There are many things that can b
     -   On systems with **3 or more monitors**, this value determines the exact monitor.
     -   On **2-monitor setups**, windows switch on the **secondary** monitor.
     -   On **single-monitor setups**, it defaults to the **primary** monitor.
+
+-   To set **primary keyboard layout** which is used for VS Code, modify the `primaryKeyboardLayout` variable.  
+    To set **secondary keyboard layout** which is used for Discord, modify the `secondaryKeyboardLayout` variable.
 
 -   To change the VS Code font that will be used in **portable mode**, modify `portableVSCodeFont` variable.  
     To change the VS Code font that will be used in **home mode**, modify `homeVSCodeFont` variable.

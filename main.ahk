@@ -24,6 +24,7 @@
 ; Actions independent of mode:
     ; Run Everything program on logon
     ; Change app theme based on sunrise and sunset time or on times set in settings
+    ; Change keyboard layout based on active window - primary for VS Code, secondary for Discord and default for other apps
 
 ; Note:
 ; Many settings can be changed in the settings.ini file, including disabling any action or hotkey and setting custom hotkey key combiantions
@@ -35,6 +36,8 @@ powerSaverGUID := IniRead("local_config.ini", "GUID", "powerSaverGUID", "")  ; G
 
 ; General settings
 monitorToSwitchWindowsOn := IniRead("settings.ini", "General", "monitorToSwitchWindowsOn", 1)  ; Monitor on which the windows will be switching (only 3 or more monitors, otherwise it is the secondary monitor if 2 and primary monitor if 1)
+primaryKeyboardLayout := IniRead("settings.ini", "General", "primaryKeyboardLayout", 0)
+secondaryKeyboardLayout := IniRead("settings.ini", "General", "secondaryKeyboardLayout", 0)
 portableVSCodeFont := IniRead("settings.ini", "General", "portableVSCodeFont", "")
 homeVSCodeFont := IniRead("settings.ini", "General", "homeVSCodeFont", "")
 
@@ -58,6 +61,7 @@ discordStart := IniRead("settings.ini", "ActionToggler", "discordStart", 1)
 spotifyStart := IniRead("settings.ini", "ActionToggler", "spotifyStart", 1)
 gameLaunchersOperations := IniRead("settings.ini", "ActionToggler", "gameLaunchersOperations", 1)
 VSCodeFontChange := IniRead("settings.ini", "ActionToggler", "VSCodeFontChange", 1)
+keyboardLayoutChange := IniRead("settings.ini", "ActionToggler", "keyboardLayoutChange", 1)
 
 ; Hotkey toggler
 minimizeWindowsToggler := IniRead("settings.ini", "HotkeyToggler", "minimizeWindows", 1)
@@ -94,6 +98,7 @@ spotify_exe := "Spotify.exe"
 steam_exe := "Steam.exe"
 epicgames_exe := "EpicGamesLauncher.exe"
 wargaming_exe := "wgc.exe"
+vscode_exe := "Code.exe"
 everythingPath := A_ProgramFiles "\Everything\" everything_exe
 ; GetDirStartsWith function ensures that Discord.exe file is always found regardless of version
 discordPath := GetDirStartsWith("C:\Users\" A_UserName "\AppData\Local\Discord\app*") discord_exe
@@ -120,12 +125,18 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling 
 
 ; Main
 
+; Run Everything on logon
+if runEverythingOnLogon && !ProcessExist(everything_exe) && FileExist(everythingPath)
+    Run(everythingPath, , "Hide")
+
+; Check keyboard layout
+if keyboardLayoutChange && AreChosenLayoutsInstalled()
+    SetTimer(CheckKeyboardLayout, 200)
+
 ; State-based actions
-if runEverythingOnLogon || changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
+if changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
 {
     ; Used on logon
-    if runEverythingOnLogon && !ProcessExist(everything_exe) && FileExist(everythingPath)
-        Run(everythingPath, , "Hide")
     CheckState()
     logon := false
 
@@ -168,7 +179,10 @@ if compareTextsToggler
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Main function that check states and manage state-based actions
+/**
+ * @description  
+ * Check states and manage state-based actions.
+ */
 CheckState()
 {
     global wasPortableEnabled
@@ -618,6 +632,62 @@ CheckState()
         file := FileOpen(VSCodeSettingsPath, "w", "UTF-8") ; w = write (overwrite)
         file.Write(contentNew)
         file.Close()
+    }
+}
+
+/**
+ * @description  
+ * Check keyboard layout if it is correct based on active window. For Discord use secondary keyboard layout, for VS Code use primary keyboard layout and for other apps use default keyboard layout.
+ */
+CheckKeyboardLayout()
+{
+    static last_id := 0  ; ID of window that was active before Discord or VS Code
+    static lastProcessName := ""  ; Process name of window that was active before Discord or VS Code
+    static wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout  ; If primary is default keyboard layout (default is that one which was active before Discord or VS Code)
+
+    ; Get the active window ID
+    active_id := WinExist("A")
+
+    ; Check layout only if active window changed
+    if (active_id != last_id)
+    {
+        last_id := active_id
+
+        try
+            processName := WinGetProcessName(active_id)
+        catch
+            return
+
+        Sleep 100  ; Needed to work properly, 100 is minimum
+
+        ; If Discord is active activate secondary keyboard layout
+        if processName = discord_exe
+        {
+            ; If VS Code wasn't active set default layout otherwise it will be used that one which was active before VS Code
+            if lastProcessName != vscode_exe
+                wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout
+            SetKeyboardLayout(secondaryKeyboardLayout)
+        }
+        ; If VS Code is active activate primary keyboard layout
+        else if processName = vscode_exe
+        {
+            ; If Discord wasn't active set default layout otherwise it will be used that one which was active before Discord
+            if lastProcessName != discord_exe
+                wasPrimary := GetKeyboardLayout() = primaryKeyboardLayout
+            SetKeyboardLayout(primaryKeyboardLayout)
+        }
+        ; Switch back to the default keyboard layout after Discord or VS Code was active
+        else
+        {
+            if lastProcessName = discord_exe && wasPrimary
+                SetKeyboardLayout(primaryKeyboardLayout)
+            else if lastProcessName = vscode_exe && !wasPrimary
+                SetKeyboardLayout(secondaryKeyboardLayout)
+        }
+
+        ; Set new lastProcessName only if process name isn't explorer (task bar)
+        if processName != "explorer.exe"
+            lastProcessName := processName
     }
 }
 
@@ -1204,4 +1274,73 @@ DisableThreadMerge()
 {
     global threadMergeEnabled
     threadMergeEnabled := false
+}
+
+/**
+ * @description  
+ * Check if primary and secondary keyboard layouts are installed. It checks keyboard language IDs only not specific keyboard layout IDs.
+ * @returns {(Integer)}  
+ * 1 if both layouts exist, 0 if not
+ */
+AreChosenLayoutsInstalled()
+{
+    primaryExist := false
+    secondaryExist := false
+
+    ; Determine how many layouts are installed
+    numLayouts := DllCall("GetKeyboardLayoutList", "Int", 0, "Ptr", 0)
+
+    ; Create a buffer to hold the layout IDs
+    layoutIDs := Buffer(numLayouts * A_PtrSize)
+    DllCall("GetKeyboardLayoutList", "Int", numLayouts, "Ptr", layoutIDs)
+
+    loop numLayouts
+    {
+        ; Extract the ID from the buffer
+        hkl := NumGet(layoutIDs, (A_Index - 1) * A_PtrSize, "Ptr")
+
+        ; Extract the Language ID
+        langID := hkl & 0xFFFF
+
+        ; Check if both primary and secondary keyboard layouts are installed
+        if primaryKeyboardLayout = langID
+            primaryExist := true
+        if secondaryKeyboardLayout = langID
+            secondaryExist := true
+    }
+    return primaryExist && secondaryExist
+}
+
+/**
+ * @description  
+ * Set keyboard layout language from parameter if it is not already active. It is supposed to be used for changing keyboard language not for changing specific layouts of one language.
+ * @param {(Integer)} langID  
+ * Hexadecimal number in format 0xFFFF.
+ */
+SetKeyboardLayout(langID)
+{
+    ; Check layout is already correct to avoid spamming Windows messages
+    if GetKeyboardLayout() != langID
+    {
+        activeWindow := WinExist("A")
+        if activeWindow
+            PostMessage(0x0050, 0x0002, langID, , activeWindow)
+    }
+}
+
+/**
+ * @description  
+ * Get active keyboard layout language ID. It gets active keyboard language ID only not specific keyboard layout ID.
+ * @returns {(Integer)}  
+ * Hexadecimal number in format 0xFFFF.
+ */
+GetKeyboardLayout()
+{
+    try
+    {
+        threadID := DllCall("GetWindowThreadProcessId", "ptr", WinActive("A"), "uint*", 0, "uint")
+        hkl := DllCall("GetKeyboardLayout", "uint", threadID, "ptr")  ; Full keyboard layout ID
+        return hkl & 0xFFFF  ; 0xFFFF is bitmask and it is used to convert full keyboard layout ID to keyboard language ID
+    }
+    return 0
 }
