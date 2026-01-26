@@ -1103,27 +1103,45 @@ GetDirStartsWith(start)
 }
 
 /**
- * @description Checks if the window has border but I use it to check if the window is "normal window".  
+ * @description Checks if the window is in fullscreen mode.  
+ * @param {(Integer)} winID  
+ * ID of window to be checked.
+ * @returns {(Integer)}  
+ * 1 if fullscreen, 0 if not.
+ */
+WinIsFullscreen(winID)
+{
+    ; Check if window is in fullscreen mode only if it is maximized, otherwise it can't be in fullscreen mode
+    if WinGetMinMax(winID) != 1
+        return 0
+
+    WinGetClientPos , , &winClientWidth, &winClientHeight, winID  ; Get coordinates of window
+    WinGetPos , , &winWidth, &winHeight, winID  ; Get coordinates of window
+    ; If client and normal window dimensions are equal and window is maximized then it is in fullscreen mode
+    if winWidth = winClientWidth && winHeight = winClientHeight
+        return 1
+    return 0
+}
+
+/**
+ * @description Checks if the window has border or if it is in fullscreen mode but I use it to check if the window is "normal window".  
  * "Normal window" is a window that is in foreground (minimized, maximized, restored, etc.) and not a special window on background like Program Manager, etc.
- * @param {'ahk_exe '|'ahk_class '|'ahk_id '|'ahk_pid '|'ahk_group '} winTitle  
- * A string using a {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm|WinTitle} to match a window.  
- * Types: {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_exe|ahk_exe}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_class|ahk_class}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_id|ahk_id}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_pid|ahk_pid}, {@link https://www.autohotkey.com/docs/v2/misc/WinTitle.htm#ahk_group|ahk_group}  
- * Window title is optional and must come before any `ahk_` criteria.  
- * If WinTitle is the letter `A`, the active window is used.  
+ * @param {(Integer)} winID  
+ * ID of window to be checked.
  * @returns {(Integer)}  
  * The ID of the specified window.
  * If the window is not "normal" or ID is 0 or does not exist, 0 is returned.
  */
-WinIsNormal(winTitle)
+WinIsNormal(winID)
 {
-    if !winTitle
+    if !winID
         return 0
     try
-        style := WinGetStyle(winTitle)
+        style := WinGetStyle(winID)
     catch
         return 0
-    if style & 0x800000
-        return winTitle
+    if style & 0x800000 || WinIsFullscreen(winID)
+        return winID
     return 0
 }
 
@@ -1176,13 +1194,12 @@ ContainsElement(list, target)
  */
 IsOnMonitor(winTitle, monitorNumber, offsetSwitch)
 {
-    global monitorOffset
     offset := monitorOffset
     if !offsetSwitch
         offset := 0
-    MonitorGet monitorNumber, &left, &top, &right, &bottom  ; Get coordinates of the primary monitor
-    WinGetClientPos &outX, &outY, &outWidth, &outHeight, winTitle  ; Get coordinates of window of this iteration (client pos is more accurate then window pos)
-    return outX < right - offset && outX + outWidth > left + offset && outY < bottom - offset && outY + outHeight > top + offset  ; Check if on the primary monitor
+    MonitorGet monitorNumber, &left, &top, &right, &bottom  ; Get coordinates of the monitor
+    WinGetClientPos &winX, &winY, &winWidth, &winHeight, winTitle  ; Get coordinates of window (client pos is more accurate then window pos)
+    return winX < right - offset && winX + winWidth > left + offset && winY < bottom - offset && winY + winHeight > top + offset  ; Check if on the monitor
 }
 
 /**
