@@ -119,25 +119,6 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")  ; Ignore DPI scaling 
 
 ; Main
 
-; Run Everything on logon
-if runEverythingOnLogon && !ProcessExist(everythingExe) && FileExist(everythingPath)
-    Run(everythingPath, , "Hide")
-
-; Check keyboard layout
-if keyboardLayoutChange && AreChosenLayoutsInstalled()
-    SetTimer(CheckKeyboardLayout, 200)
-
-; State-based actions
-if changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
-{
-    ; Used on logon
-    CheckState()
-    logon := false
-
-    ; Check states every 60 seconds
-    SetTimer(CheckState, 60000)
-}
-
 ; Hotkeys
 ; Disable hotkeys that will be used because they are usually used by system and map hotkeys actions to hotkey release
 if minimizeWindowsToggler
@@ -169,6 +150,25 @@ if compareTextsToggler
 {
     Hotkey(compareTextsHotkey, Empty)
     Hotkey(compareTextsHotkey " Up", CompareTexts)
+}
+
+; Run Everything on logon
+if runEverythingOnLogon && !ProcessExist(everythingExe) && FileExist(everythingPath)
+    Run(everythingPath, , "Hide")
+
+; Check keyboard layout
+if keyboardLayoutChange && AreChosenLayoutsInstalled()
+    SetTimer(CheckKeyboardLayout, 200)
+
+; State-based actions
+if changeAppTheme || changePowerPlans || discordStart || spotifyStart || gameLaunchersOperations || VSCodeFontChange
+{
+    ; Used on logon
+    CheckState()
+    logon := false
+
+    ; Check states every 60 seconds
+    SetTimer(CheckState, 60000)
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
